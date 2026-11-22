@@ -114,12 +114,22 @@ FoldTube ships a single codebase that works on both Chrome and Firefox. The `pac
 
 The script transforms the manifest per browser — Chrome gets `background.service_worker`, Firefox gets `background.scripts` — so the source `manifest.json` stays Chrome-native for local development.
 
+## Development
+
+Linting and tests use Node.js 22.13 or newer. These are development tools only; the extension itself still has no dependencies.
+
+```bash
+npm install     # Install ESLint (dev only)
+npm run lint    # Lint all extension and test code
+npm test        # Run unit tests with Node's built-in test runner
+```
+
 ---
 
 ## Tech Stack
 
 - **Manifest V3** extension — compatible with Chrome, Brave, Edge, and Firefox (142+)
-- Vanilla HTML / CSS / JavaScript — zero dependencies, zero frameworks
+- Vanilla HTML / CSS / JavaScript — zero runtime dependencies, zero frameworks
 - `chrome.storage.local` for persistence
 - `chrome.scripting` for DOM metadata extraction (with `world: 'MAIN'` for ad-safe duration capture)
 - `chrome.tabs` + `chrome.notifications` for tab management and user feedback

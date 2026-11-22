@@ -1,7 +1,7 @@
 export function scrapeYouTubeTab() {
   const isShort = window.location.pathname.startsWith('/shorts/');
   const isLive = window.location.pathname.startsWith('/live/');
-  let videoId = null;
+  let videoId;
   let videoType = 'video';
 
   if (isShort) {

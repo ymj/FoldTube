@@ -1,3 +1,4 @@
+/* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
 
 // ---- State & Storage Setup ----
@@ -399,7 +400,7 @@ async function runEnrichment() {
 }
 
 // Receive message from Dashboard
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request) => {
   if (request.action === "runEnrichment") {
     runEnrichment();
   }
