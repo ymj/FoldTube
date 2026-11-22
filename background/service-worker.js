@@ -1,8 +1,8 @@
 /* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
-import { urlToVideoData, parseVideoUrl, parseIsoDuration, formatDuration } from '../lib/youtube.js';
-import { foldTabs } from '../lib/fold.js';
-import { createVideoStore, applyVideoOp, patchVideos } from '../lib/store.js';
+import { parseVideoUrl, parseIsoDuration, formatDuration } from '../lib/youtube.js';
+import { foldTabs, autoCollapseVideo } from '../lib/fold.js';
+import { createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
 
 // ---- Saved videos: single owner ----
 
@@ -67,13 +67,9 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
 
     if (chrome.storage && chrome.storage.session) {
       const { activeYoutubeTabs = {} } = await chrome.storage.session.get("activeYoutubeTabs");
-      const tabData = activeYoutubeTabs[tabId];
-      
-      if (tabData) {
-        const videoObj = urlToVideoData(tabData.url, tabData.title);
-        if (videoObj) {
-          await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [videoObj] }));
-        }
+      const video = autoCollapseVideo(removeInfo, settings, activeYoutubeTabs[tabId]);
+      if (video) {
+        await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
       }
     }
   } else {
@@ -211,7 +207,6 @@ chrome.runtime.onStartup.addListener(async () => {
 
 async function reconcileTabs() {
   const physicalTabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
-  if (physicalTabs.length === 0) return;
 
   // Extract video IDs from restored tabs for robust matching regardless of
   // extra query params (timestamps, playlist refs, etc.) that may differ.
@@ -219,13 +214,9 @@ async function reconcileTabs() {
     physicalTabs.map(t => parseVideoUrl(t.url)?.videoId).filter(Boolean)
   );
 
-  // An auto-collapsed video whose tab the browser restored is a duplicate.
-  const { removed } = await mutateSavedVideos(videos => applyVideoOp(videos, {
-    type: 'remove',
-    videoIds: videos
-      .filter(v => v.metadataSource === "auto-collapsed" && physicalVideoIds.has(v.videoId))
-      .map(v => v.videoId),
-  }));
+  // A video saved on window close whose tab the browser restored is a
+  // duplicate; the rest are kept and marked checked (see lib/store.js).
+  const { removed } = await mutateSavedVideos(videos => reconcileRestoredTabs(videos, physicalVideoIds));
   if (removed.length) console.log(`Reconciled ${removed.length} restored tab(s) already open.`);
 }
 
