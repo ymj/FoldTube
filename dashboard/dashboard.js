@@ -1,4 +1,4 @@
-import { validateImport, mergeVideos } from '../lib/youtube.js';
+import { validateImport, mergeVideos, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor } from '../lib/youtube.js';
 
 let allVideos = [];
 let selectedVideoIds = new Set();
@@ -197,31 +197,7 @@ function bindControls() {
 
   // Export HTML
   document.getElementById('btn-export-html').addEventListener('click', () => {
-    let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>FoldTube Backup — ${today()}</title>
-<style>
-  body { font-family: -apple-system, sans-serif; background: #0f0f0f; color: #f1f1f1; padding: 2rem; max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-  p.sub { color: #aaa; font-size: 0.9rem; margin-top: 0; margin-bottom: 1.5rem; }
-  ul { list-style: none; padding: 0; }
-  li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #222; }
-  img { width: 120px; border-radius: 4px; flex-shrink: 0; }
-  .info a { color: #3ea6ff; text-decoration: none; font-weight: 600; }
-  .info a:hover { text-decoration: underline; }
-  .meta { color: #aaa; font-size: 0.85rem; margin-top: 4px; }
-</style></head><body>
-<h1>FoldTube Backup</h1>
-<p class="sub">${allVideos.length} saved tabs · Exported ${new Date().toLocaleString()}</p>
-<ul>`;
-    allVideos.forEach(v => {
-      html += `<li>
-        <img src="https://img.youtube.com/vi/${v.videoId}/mqdefault.jpg" alt="">
-        <div class="info">
-          <a href="${v.url}" target="_blank">${escapeHtml(v.title)}</a>
-          <div class="meta">${escapeHtml(v.channelName)}${v.durationFormatted ? ` · ${v.durationFormatted}` : ''}</div>
-        </div>
-      </li>`;
-    });
-    html += `</ul></body></html>`;
+    const html = buildHtmlExport(allVideos, { date: today(), exportedAt: new Date().toLocaleString() });
     triggerDownload(new Blob([html], { type: "text/html" }), `foldtube_bookmarks_${today()}.html`);
   });
 
@@ -294,9 +270,11 @@ function bindControls() {
   document.getElementById('btn-open-selected').addEventListener('click', async () => {
     if (!selectedVideoIds.size) return;
     if (selectedVideoIds.size > 10 && !confirm(`This will open ${selectedVideoIds.size} tabs. Continue?`)) return;
-    const ids = new Set(selectedVideoIds);
-    const count = ids.size;
-    const removed = allVideos.filter(v => ids.has(v.videoId));
+    // Only entries with a YouTube link are opened and removed; others stay saved.
+    const removed = allVideos.filter(v => selectedVideoIds.has(v.videoId) && isYouTubeUrl(v.url));
+    const ids = new Set(removed.map(v => v.videoId));
+    const count = removed.length;
+    if (count === 0) return;
     const newVideos = allVideos.filter(v => !ids.has(v.videoId));
     removed.forEach(v => chrome.tabs.create({ url: v.url, active: false }));
     selectedVideoIds.clear();
@@ -457,9 +435,10 @@ function createCard(video, index) {
   const img = document.createElement('img');
   img.className = 'thumbnail';
   img.loading = 'lazy';
-  img.src = video.thumbnailUrl || '';
+  // Always derived from the video ID, never taken from stored data.
+  img.src = thumbnailUrlFor(video.videoId);
   img.alt = video.title || '';
-  img.onerror = function() { this.onerror = null; this.src = `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`; };
+  img.onerror = function() { this.onerror = null; this.src = thumbnailUrlFor(video.videoId, 'hqdefault'); };
   thumbContainer.appendChild(img);
 
   if (video.durationFormatted) {
@@ -481,7 +460,7 @@ function createCard(video, index) {
   cardContent.appendChild(title);
 
   const channel = document.createElement('a');
-  channel.href = video.channelUrl || '#';
+  channel.href = isYouTubeUrl(video.channelUrl) ? video.channelUrl : '#';
   channel.className = 'channel';
   channel.target = '_blank';
   channel.rel = 'noopener noreferrer';
@@ -542,6 +521,7 @@ async function deleteSingleVideo(video, cardElement) {
 }
 
 async function openSingleVideo(video, cardElement) {
+  if (!isYouTubeUrl(video.url)) return; // not a YouTube link: keep it saved, open nothing
   chrome.tabs.create({ url: video.url });
   cardElement.classList.add('card-exit');
   setTimeout(async () => {
@@ -560,11 +540,4 @@ function triggerDownload(blob, filename) {
 
 function today() {
   return new Date().toISOString().split('T')[0];
-}
-
-function escapeHtml(unsafe) {
-  if (!unsafe) return '';
-  return unsafe.toString()
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }

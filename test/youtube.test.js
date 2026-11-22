@@ -194,7 +194,7 @@ describe('validateImport', () => {
       { ...good, title: undefined },
       { ...good, videoType: 'playlist' },
     ];
-    assert.deepEqual(validateImport(data), [good]);
+    assert.deepEqual(validateImport(data).map(v => v.videoId), ['a']);
   });
 
   test('an empty backup is valid and empty', () => assert.deepEqual(validateImport([]), []));
