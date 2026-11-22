@@ -29,3 +29,6 @@ node_modules/
 # Build output
 dist/
 build/
+
+# Internal planning docs (not for public repo yet)
+docs/
