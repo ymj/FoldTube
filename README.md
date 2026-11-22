@@ -118,7 +118,7 @@ The script transforms the manifest per browser — Chrome gets `background.servi
 
 ## Tech Stack
 
-- **Manifest V3** extension — compatible with Chrome, Brave, Edge, and Firefox (128+)
+- **Manifest V3** extension — compatible with Chrome, Brave, Edge, and Firefox (142+)
 - Vanilla HTML / CSS / JavaScript — zero dependencies, zero frameworks
 - `chrome.storage.local` for persistence
 - `chrome.scripting` for DOM metadata extraction (with `world: 'MAIN'` for ad-safe duration capture)

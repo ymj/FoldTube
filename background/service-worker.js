@@ -67,6 +67,7 @@ async function processAndSaveTabs(tabs) {
   if (!tabs || tabs.length === 0) return 0;
 
   const newVideos = [];
+  let closedCount = 0;
 
   for (const tab of tabs) {
     try {
@@ -123,6 +124,7 @@ async function processAndSaveTabs(tabs) {
         }
       }
       await chrome.tabs.remove(tab.id);
+      closedCount++;
     } catch (e) {
       console.error(`Failed to process tab ${tab.id}:`, e);
     }
@@ -140,7 +142,7 @@ async function processAndSaveTabs(tabs) {
     runEnrichment();
   }
 
-  return tabs.length;
+  return closedCount;
 }
 
 async function handleCollapse() {
@@ -151,14 +153,14 @@ async function handleCollapse() {
   ] });
   
   if (tabs.length > 0) {
-    await processAndSaveTabs(tabs);
+    const folded = await processAndSaveTabs(tabs);
 
     try {
       chrome.notifications.create("foldtube-collapse", {
         type: "basic",
         iconUrl: chrome.runtime.getURL("icons/icon128.png"),
         title: "FoldTube",
-        message: `Folded ${tabs.length} YouTube tab${tabs.length === 1 ? '' : 's'}!`
+        message: `Folded ${folded} YouTube tab${folded === 1 ? '' : 's'}`
       });
     } catch (_) { /* notification is non-critical */ }
   } else {

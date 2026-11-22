@@ -540,7 +540,11 @@ async function deleteSingleVideo(video, cardElement) {
   setTimeout(async () => {
     await chrome.storage.local.set({ savedVideos: newVideos });
   }, 300);
-  showUndoToast(`"${video.title.substring(0, 40)}..." removed`, async () => {
+  const title = typeof video.title === 'string' ? video.title.trim() : '';
+  const toastMsg = title
+    ? `"${title.length > 40 ? title.slice(0, 40) + '…' : title}" removed`
+    : 'Video removed';
+  showUndoToast(toastMsg, async () => {
     await chrome.storage.local.set({ savedVideos: snapshot });
   });
 }
