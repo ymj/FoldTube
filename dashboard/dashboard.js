@@ -1,4 +1,4 @@
-import { validateImport, mergeVideos, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor } from '../lib/youtube.js';
+import { validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor } from '../lib/youtube.js';
 
 let allVideos = [];
 let selectedVideoIds = new Set();
@@ -112,6 +112,23 @@ function showSkeletons(count = 8) {
   }
 }
 
+// ---- Changing the library ----
+// The service worker owns savedVideos; the dashboard asks it for changes and
+// re-renders from storage.onChanged, so there is one write and one render.
+async function changeVideos(op) {
+  const response = await chrome.runtime.sendMessage({ action: 'mutateVideos', op });
+  if (!response?.ok) throw new Error(response?.error || 'FoldTube background did not respond');
+  return response.result;
+}
+
+function removeVideos(videoIds) {
+  return changeVideos({ type: 'remove', videoIds });
+}
+
+function restoreVideos(removed) {
+  return changeVideos({ type: 'restore', entries: removed });
+}
+
 // ---- Undo Toast ----
 function showUndoToast(message, restoreFn) {
   clearTimeout(undoTimer);
@@ -212,10 +229,9 @@ function bindControls() {
     reader.onload = async (evt) => {
       try {
         const validItems = validateImport(JSON.parse(evt.target.result));
-        const { merged, added: newItems } = mergeVideos(validItems, allVideos);
-        await chrome.storage.local.set({ savedVideos: merged });
+        const { added } = await changeVideos({ type: 'add', videos: validItems });
         settingsModal.close();
-        alert(`Imported ${newItems.length} new video${newItems.length === 1 ? '' : 's'}!`);
+        alert(`Imported ${added} new video${added === 1 ? '' : 's'}!`);
       } catch {
         alert("Failed to parse the JSON file. Please check it's a valid FoldTube backup.");
       }
@@ -275,14 +291,11 @@ function bindControls() {
     const ids = new Set(removed.map(v => v.videoId));
     const count = removed.length;
     if (count === 0) return;
-    const newVideos = allVideos.filter(v => !ids.has(v.videoId));
     removed.forEach(v => chrome.tabs.create({ url: v.url, active: false }));
     selectedVideoIds.clear();
     updateSelectionBar();
-    await chrome.storage.local.set({ savedVideos: newVideos });
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, async () => {
-      await chrome.storage.local.set({ savedVideos: [...removed, ...newVideos] });
-    });
+    const result = await removeVideos([...ids]);
+    showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => restoreVideos(result.removed));
   });
 
   document.getElementById('btn-delete-selected').addEventListener('click', async () => {
@@ -290,14 +303,10 @@ function bindControls() {
     const ids = new Set(selectedVideoIds);
     const count = ids.size;
     if (count > 1 && !confirm(`Delete ${count} selected videos?`)) return;
-    const removed = allVideos.filter(v => ids.has(v.videoId));
-    const newVideos = allVideos.filter(v => !ids.has(v.videoId));
     selectedVideoIds.clear();
     updateSelectionBar();
-    await chrome.storage.local.set({ savedVideos: newVideos });
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, async () => {
-      await chrome.storage.local.set({ savedVideos: [...removed, ...newVideos] });
-    });
+    const result = await removeVideos([...ids]);
+    showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => restoreVideos(result.removed));
   });
 }
 
@@ -504,30 +513,21 @@ function createCard(video, index) {
 
 async function deleteSingleVideo(video, cardElement) {
   cardElement.classList.add('card-exit');
-  // Snapshot captured synchronously — before anything can mutate allVideos
-  // during the animation delay.
-  const snapshot = [...allVideos];
-  const newVideos = snapshot.filter(v => v.videoId !== video.videoId);
-  setTimeout(async () => {
-    await chrome.storage.local.set({ savedVideos: newVideos });
-  }, 300);
+  // Remove after the exit animation; undo waits for the removal to finish.
+  const removal = new Promise(resolve => setTimeout(resolve, 300))
+    .then(() => removeVideos([video.videoId]));
   const title = typeof video.title === 'string' ? video.title.trim() : '';
   const toastMsg = title
     ? `"${title.length > 40 ? title.slice(0, 40) + '…' : title}" removed`
     : 'Video removed';
-  showUndoToast(toastMsg, async () => {
-    await chrome.storage.local.set({ savedVideos: snapshot });
-  });
+  showUndoToast(toastMsg, async () => restoreVideos((await removal).removed));
 }
 
 async function openSingleVideo(video, cardElement) {
   if (!isYouTubeUrl(video.url)) return; // not a YouTube link: keep it saved, open nothing
   chrome.tabs.create({ url: video.url });
   cardElement.classList.add('card-exit');
-  setTimeout(async () => {
-    const newVideos = allVideos.filter(v => v.videoId !== video.videoId);
-    await chrome.storage.local.set({ savedVideos: newVideos });
-  }, 300);
+  setTimeout(() => removeVideos([video.videoId]), 300);
 }
 
 // ---- Utilities ----
