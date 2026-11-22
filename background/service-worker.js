@@ -1,7 +1,18 @@
 /* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
-import { urlToVideoData, parseVideoUrl, parseIsoDuration, formatDuration, mergeVideos } from '../lib/youtube.js';
+import { urlToVideoData, parseVideoUrl, parseIsoDuration, formatDuration } from '../lib/youtube.js';
 import { foldTabs } from '../lib/fold.js';
+import { createVideoStore, applyVideoOp, patchVideos } from '../lib/store.js';
+
+// ---- Saved videos: single owner ----
+
+// Every change to savedVideos goes through mutateSavedVideos, one at a time,
+// applied to the array as stored *now* (see lib/store.js). This is the only
+// place that writes it.
+const mutateSavedVideos = createVideoStore({
+  read: async () => (await chrome.storage.local.get("savedVideos")).savedVideos || [],
+  write: (videos) => chrome.storage.local.set({ savedVideos: videos }),
+});
 
 // ---- State & Storage Setup ----
 
@@ -31,8 +42,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// Auto-Collapse tracking logic with Queue to prevent races at termination
-let savingPromise = Promise.resolve();
+// ---- Auto-collapse when a window closes ----
 
 chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
   if (removeInfo.isWindowClosing) {
@@ -44,18 +54,10 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
       const tabData = activeYoutubeTabs[tabId];
       
       if (tabData) {
-        // Enforce linear asynchronous saving sequence
-        savingPromise = savingPromise.then(async () => {
-          const videoObj = urlToVideoData(tabData.url, tabData.title);
-          if (!videoObj) return;
-
-          const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
-          const alreadyExists = savedVideos.some(v => v.videoId === videoObj.videoId);
-          if (!alreadyExists) {
-            savedVideos.unshift(videoObj);
-            await chrome.storage.local.set({ savedVideos });
-          }
-        });
+        const videoObj = urlToVideoData(tabData.url, tabData.title);
+        if (videoObj) {
+          await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [videoObj] }));
+        }
       }
     }
   } else {
@@ -108,15 +110,9 @@ async function scrapeTab(tab) {
   return metadata;
 }
 
-// Save folded videos newest first, queued behind any other save in progress.
+// Save folded videos newest first, after any other change in progress.
 function saveFoldedVideos(videos) {
-  const run = savingPromise.then(async () => {
-    const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
-    const { merged } = mergeVideos(videos, savedVideos);
-    await chrome.storage.local.set({ savedVideos: merged });
-  });
-  savingPromise = run.catch(() => {});
-  return run;
+  return mutateSavedVideos(current => applyVideoOp(current, { type: 'add', videos }));
 }
 
 // Save first, then close only the tabs that were saved (see lib/fold.js).
@@ -246,9 +242,6 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 async function reconcileTabs() {
-  const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
-  if (savedVideos.length === 0) return;
-
   const physicalTabs = await chrome.tabs.query({ url: ["*://*.youtube.com/watch?v=*", "*://*.youtube.com/shorts/*", "*://*.youtube.com/live/*"] });
   if (physicalTabs.length === 0) return;
 
@@ -258,26 +251,24 @@ async function reconcileTabs() {
     physicalTabs.map(t => parseVideoUrl(t.url)?.videoId).filter(Boolean)
   );
 
-  const cleansedVideos = savedVideos.filter(video => {
-    // If it was auto-collapsed, and the browser cleanly restored it, delete it.
-    if (video.metadataSource === "auto-collapsed" && physicalVideoIds.has(video.videoId)) {
-      return false; // Remove!
-    }
-    return true; // Keep!
-  });
-
-  if (cleansedVideos.length !== savedVideos.length) {
-    await chrome.storage.local.set({ savedVideos: cleansedVideos });
-    console.log(`Reconciled and destroyed ${savedVideos.length - cleansedVideos.length} duplicated restored tabs.`);
-  }
+  // An auto-collapsed video whose tab the browser restored is a duplicate.
+  const { removed } = await mutateSavedVideos(videos => applyVideoOp(videos, {
+    type: 'remove',
+    videoIds: videos
+      .filter(v => v.metadataSource === "auto-collapsed" && physicalVideoIds.has(v.videoId))
+      .map(v => v.videoId),
+  }));
+  if (removed.length) console.log(`Reconciled ${removed.length} restored tab(s) already open.`);
 }
 
 async function runEnrichment() {
   const { settings = {} } = await chrome.storage.local.get("settings");
   if (!settings.apiKey) return;
 
-  let { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
-  
+  // Read once to choose what to look up; the results are applied to the list
+  // as it is when each batch returns, so changes made meanwhile survive.
+  const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
+
   const needsEnrichment = savedVideos.filter(v => 
     v.durationSeconds === 0 || 
     v.channelName === "Unknown Channel" || 
@@ -290,7 +281,6 @@ async function runEnrichment() {
 
   const apiKey = settings.apiKey;
   const idsToProcess = [...new Set(needsEnrichment.map(v => v.videoId))];
-  let isModified = false;
 
   for (let i = 0; i < idsToProcess.length; i += 50) {
     const batch = idsToProcess.slice(i, i + 50);
@@ -306,39 +296,46 @@ async function runEnrichment() {
         await chrome.storage.local.set({ apiError: false }); // Clear if success
       }
       
-      if (data.items) {
-        data.items.forEach(item => {
-          // Update all references in savedVideos (in case of dupes)
-          savedVideos.forEach(video => {
-            if (video.videoId === item.id) {
-              video.title = item.snippet.title;
-              video.channelName = item.snippet.channelTitle;
-              
-              // Map Duration ISO 8601
-              const seconds = parseIsoDuration(item.contentDetails?.duration);
-              if (seconds !== null) {
-                video.durationSeconds = seconds;
-                video.durationFormatted = formatDuration(seconds);
-              }
-              video.metadataSource = 'api-enriched';
-              isModified = true;
-            }
-          });
-        });
+      if (data.items?.length) {
+        const patches = new Map();
+        for (const item of data.items) {
+          const patch = {
+            title: item.snippet.title,
+            channelName: item.snippet.channelTitle,
+            metadataSource: 'api-enriched',
+          };
+          const seconds = parseIsoDuration(item.contentDetails?.duration);
+          if (seconds !== null) {
+            patch.durationSeconds = seconds;
+            patch.durationFormatted = formatDuration(seconds);
+          }
+          patches.set(item.id, patch);
+        }
+        await mutateSavedVideos(videos => patchVideos(videos, patches));
       }
     } catch(e) {
       console.error("API Enrichment fetch failed.", e);
     }
   }
-
-  if (isModified) {
-    await chrome.storage.local.set({ savedVideos });
-  }
 }
 
-// Receive message from Dashboard
-chrome.runtime.onMessage.addListener((request) => {
+// ---- Messages from the dashboard ----
+
+const DASHBOARD_OPS = new Set(['add', 'remove', 'restore']);
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Only this extension's own pages may change the library.
+  if (sender.id !== chrome.runtime.id) return;
+
   if (request.action === "runEnrichment") {
     runEnrichment();
+    return;
+  }
+
+  if (request.action === "mutateVideos" && DASHBOARD_OPS.has(request.op?.type)) {
+    mutateSavedVideos(videos => applyVideoOp(videos, request.op))
+      .then(result => sendResponse({ ok: true, result }))
+      .catch(e => sendResponse({ ok: false, error: String(e?.message || e) }));
+    return true; // respond asynchronously
   }
 });
