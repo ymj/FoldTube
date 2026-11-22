@@ -8,7 +8,7 @@ export default [
   js.configs.recommended,
   {
     // Extension code that runs as ES modules (service worker, scraper).
-    files: ['background/**/*.js', 'content/**/*.js'],
+    files: ['background/**/*.js', 'content/**/*.js', 'lib/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
@@ -16,13 +16,17 @@ export default [
     },
   },
   {
-    // Dashboard pages load classic scripts.
+    // Dashboard: dashboard.js is a module; theme-init.js is a classic script.
     files: ['dashboard/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: 'script',
+      sourceType: 'module',
       globals: { ...globals.browser, ...globals.webextensions },
     },
+  },
+  {
+    files: ['dashboard/theme-init.js'],
+    languageOptions: { sourceType: 'script' },
   },
   {
     // Tooling and tests run in Node.

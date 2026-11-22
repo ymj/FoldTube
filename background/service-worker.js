@@ -1,5 +1,6 @@
 /* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
+import { urlToVideoData, parseVideoUrl, parseIsoDuration, formatDuration, mergeVideos } from '../lib/youtube.js';
 
 // ---- State & Storage Setup ----
 
@@ -112,13 +113,7 @@ async function processAndSaveTabs(tabs) {
             const realDuration = Math.round(durResults[0]?.result || 0);
             if (realDuration > 0) {
               metadata.durationSeconds = realDuration;
-              const h = Math.floor(realDuration / 3600);
-              const m = Math.floor((realDuration % 3600) / 60);
-              const s = realDuration % 60;
-              const hStr = h > 0 ? `${h}:` : '';
-              const mStr = h > 0 ? m.toString().padStart(2, '0') : m.toString();
-              const sStr = s.toString().padStart(2, '0');
-              metadata.durationFormatted = `${hStr}${mStr}:${sStr}`;
+              metadata.durationFormatted = formatDuration(realDuration);
             }
           } catch (_) { /* duration enrichment is best-effort */ }
           newVideos.push(metadata);
@@ -133,11 +128,9 @@ async function processAndSaveTabs(tabs) {
 
   if (newVideos.length > 0) {
     const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
-    const savedIds = new Set(savedVideos.map(v => v.videoId));
-    const trulyNewVideos = newVideos.filter(v => !savedIds.has(v.videoId));
-    const updatedVideos = [...trulyNewVideos, ...savedVideos];
+    const { merged } = mergeVideos(newVideos, savedVideos);
 
-    await chrome.storage.local.set({ savedVideos: updatedVideos });
+    await chrome.storage.local.set({ savedVideos: merged });
 
     // Automatically try to enrich the missing discarded tabs
     runEnrichment();
@@ -247,45 +240,6 @@ async function handleFoldCurrentTab() {
   }
 }
 
-// ---- Utility functions ----
-
-function urlToVideoData(urlStr, rawTitle) {
-  let videoId = null;
-  let videoType = 'video';
-  try {
-    const urlObj = new URL(urlStr);
-    if (urlObj.pathname.startsWith('/shorts/')) {
-      const parts = urlObj.pathname.split('/');
-      videoId = parts[parts.length - 1];
-      videoType = 'short';
-    } else if (urlObj.pathname.startsWith('/live/')) {
-      const parts = urlObj.pathname.split('/');
-      videoId = parts[parts.length - 1];
-    } else {
-      videoId = urlObj.searchParams.get('v');
-    }
-  } catch(e) {}
-  if (!videoId) return null;
-
-  let safeTitle = rawTitle || 'Unknown Title';
-  if (safeTitle.endsWith(' - YouTube')) safeTitle = safeTitle.substring(0, safeTitle.length - 10);
-
-  return {
-    videoId,
-    videoType,
-    url: urlStr,
-    title: safeTitle,
-    channelName: "Unknown Channel",
-    channelUrl: null,
-    thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-    durationSeconds: 0,
-    durationFormatted: "",
-    description: "",
-    dateSaved: new Date().toISOString(),
-    metadataSource: 'auto-collapsed' // Overwritten if discarded manual click
-  };
-}
-
 // ---- Startup Reconciliation & Enrichment ----
 
 chrome.runtime.onStartup.addListener(async () => {
@@ -303,16 +257,9 @@ async function reconcileTabs() {
 
   // Extract video IDs from restored tabs for robust matching regardless of
   // extra query params (timestamps, playlist refs, etc.) that may differ.
-  const physicalVideoIds = new Set(physicalTabs.map(t => {
-    try {
-      const u = new URL(t.url);
-      if (u.pathname.startsWith('/shorts/') || u.pathname.startsWith('/live/')) {
-        const parts = u.pathname.split('/');
-        return parts[parts.length - 1] || null;
-      }
-      return u.searchParams.get('v');
-    } catch { return null; }
-  }).filter(Boolean));
+  const physicalVideoIds = new Set(
+    physicalTabs.map(t => parseVideoUrl(t.url)?.videoId).filter(Boolean)
+  );
 
   const cleansedVideos = savedVideos.filter(video => {
     // If it was auto-collapsed, and the browser cleanly restored it, delete it.
@@ -370,18 +317,10 @@ async function runEnrichment() {
               video.channelName = item.snippet.channelTitle;
               
               // Map Duration ISO 8601
-              const pt = item.contentDetails.duration;
-              const match = pt.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-              if (match) {
-                const h = parseInt(match[1] || 0, 10);
-                const m = parseInt(match[2] || 0, 10);
-                const s = parseInt(match[3] || 0, 10);
-                video.durationSeconds = (h * 3600) + (m * 60) + s;
-                
-                const hStr = h > 0 ? `${h}:` : '';
-                const mStr = h > 0 ? m.toString().padStart(2, '0') : m.toString();
-                const sStr = s.toString().padStart(2, '0');
-                video.durationFormatted = `${hStr}${mStr}:${sStr}`;
+              const seconds = parseIsoDuration(item.contentDetails?.duration);
+              if (seconds !== null) {
+                video.durationSeconds = seconds;
+                video.durationFormatted = formatDuration(seconds);
               }
               video.metadataSource = 'api-enriched';
               isModified = true;

@@ -1,3 +1,5 @@
+import { validateImport, mergeVideos } from '../lib/youtube.js';
+
 let allVideos = [];
 let selectedVideoIds = new Set();
 let searchQuery = "";
@@ -233,19 +235,9 @@ function bindControls() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const imported = JSON.parse(evt.target.result);
-        if (!Array.isArray(imported)) throw new Error("Invalid format");
-        const validItems = imported.filter(v =>
-          v && typeof v === 'object' &&
-          typeof v.videoId === 'string' && v.videoId &&
-          typeof v.url === 'string' && v.url &&
-          typeof v.title === 'string' &&
-          ['video', 'short'].includes(v.videoType)
-        );
-        if (validItems.length === 0 && imported.length > 0) throw new Error("No valid entries");
-        const savedIds = new Set(allVideos.map(v => v.videoId));
-        const newItems = validItems.filter(v => !savedIds.has(v.videoId));
-        await chrome.storage.local.set({ savedVideos: [...newItems, ...allVideos] });
+        const validItems = validateImport(JSON.parse(evt.target.result));
+        const { merged, added: newItems } = mergeVideos(validItems, allVideos);
+        await chrome.storage.local.set({ savedVideos: merged });
         settingsModal.close();
         alert(`Imported ${newItems.length} new video${newItems.length === 1 ? '' : 's'}!`);
       } catch {
