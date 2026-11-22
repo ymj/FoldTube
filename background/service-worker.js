@@ -14,14 +14,30 @@ const mutateSavedVideos = createVideoStore({
   write: (videos) => chrome.storage.local.set({ savedVideos: videos }),
 });
 
+// ---- Shared helpers ----
+
+// Tab URL patterns for YouTube videos, Shorts and live streams.
+const YOUTUBE_TAB_PATTERNS = [
+  "*://*.youtube.com/watch?v=*",
+  "*://*.youtube.com/shorts/*",
+  "*://*.youtube.com/live/*",
+];
+
+function notify(id, message) {
+  try {
+    chrome.notifications.create(id, {
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+      title: "FoldTube",
+      message,
+    });
+  } catch (_) { /* notifications are non-critical */ }
+}
+
 // ---- State & Storage Setup ----
 
 async function updateActiveTabsCache() {
-  const tabs = await chrome.tabs.query({ url: [
-    "*://*.youtube.com/watch?v=*",
-    "*://*.youtube.com/shorts/*",
-    "*://*.youtube.com/live/*"
-  ] });
+  const tabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
   const map = {};
   for(const t of tabs) map[t.id] = { url: t.url, title: t.title };
   
@@ -131,50 +147,18 @@ async function processAndSaveTabs(tabs) {
 }
 
 async function handleCollapse() {
-  const tabs = await chrome.tabs.query({ url: [
-    "*://*.youtube.com/watch?v=*",
-    "*://*.youtube.com/shorts/*",
-    "*://*.youtube.com/live/*"
-  ] });
+  const tabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
   
   if (tabs.length > 0) {
     const { closed, leftOpen } = await processAndSaveTabs(tabs);
-    const message = `Folded ${closed} YouTube tab${closed === 1 ? '' : 's'}`
-      + (leftOpen > 0 ? ` · ${leftOpen} left open` : '');
-
-    try {
-      chrome.notifications.create("foldtube-collapse", {
-        type: "basic",
-        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-        title: "FoldTube",
-        message
-      });
-    } catch (_) { /* notification is non-critical */ }
+    notify("foldtube-collapse", `Folded ${closed} YouTube tab${closed === 1 ? '' : 's'}`
+      + (leftOpen > 0 ? ` · ${leftOpen} left open` : ''));
   } else {
-    try {
-      chrome.notifications.create("foldtube-empty", {
-        type: "basic",
-        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-        title: "FoldTube",
-        message: "No YouTube tabs found."
-      });
-    } catch (_) { /* notification is non-critical */ }
+    notify("foldtube-empty", "No YouTube tabs found.");
   }
 
   // Always open / focus the dashboard
-  try {
-    const dashboardUrl = chrome.runtime.getURL("dashboard/dashboard.html");
-    const dashboardTabs = await chrome.tabs.query({ url: dashboardUrl });
-    if (dashboardTabs.length > 0) {
-      const existingTab = dashboardTabs[0];
-      await chrome.tabs.update(existingTab.id, { active: true });
-      try { await chrome.windows.update(existingTab.windowId, { focused: true }); } catch (_) {}
-    } else {
-      await chrome.tabs.create({ url: dashboardUrl });
-    }
-  } catch (e) {
-    console.error("FoldTube: failed to open dashboard", e);
-  }
+  await handleOpenDashboard();
 }
 
 chrome.action.onClicked.addListener(handleCollapse);
@@ -207,28 +191,12 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 async function handleFoldCurrentTab() {
-  const tabs = await chrome.tabs.query({ 
-    active: true, 
-    currentWindow: true,
-    url: [
-      "*://*.youtube.com/watch?v=*",
-      "*://*.youtube.com/shorts/*",
-      "*://*.youtube.com/live/*"
-    ]
-  });
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true, url: YOUTUBE_TAB_PATTERNS });
 
   if (tabs.length > 0) {
     const { closed } = await processAndSaveTabs(tabs);
-
-    try {
-      chrome.notifications.create("foldtube-collapse-single", {
-        type: "basic",
-        iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-        title: "FoldTube",
-        message: closed > 0 ? "Folded current YouTube tab!" : "Couldn't fold this tab; it was left open."
-      });
-    } catch (_) { /* notification is non-critical */ }
-    
+    notify("foldtube-collapse-single",
+      closed > 0 ? "Folded current YouTube tab!" : "Couldn't fold this tab; it was left open.");
     await handleOpenDashboard();
   }
 }
@@ -242,7 +210,7 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 async function reconcileTabs() {
-  const physicalTabs = await chrome.tabs.query({ url: ["*://*.youtube.com/watch?v=*", "*://*.youtube.com/shorts/*", "*://*.youtube.com/live/*"] });
+  const physicalTabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
   if (physicalTabs.length === 0) return;
 
   // Extract video IDs from restored tabs for robust matching regardless of
