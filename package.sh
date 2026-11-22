@@ -42,7 +42,7 @@ done
 # manifest.json is excluded because it is transformed per browser and added
 # separately. Deriving the list from git means a new file can't be silently
 # left out of the package (verify_zip below double-checks references).
-EXCLUDE_REGEX='^(README\.md|package\.sh|manifest\.json|\..*|\.claude/.*|docs/.*|dist/.*)$'
+EXCLUDE_REGEX='^(README\.md|package\.sh|manifest\.json|package\.json|package-lock\.json|eslint\.config\.js|test/.*|node_modules/.*|\..*|\.claude/.*|docs/.*|dist/.*)$'
 
 EXT_FILES=()
 while IFS= read -r f; do

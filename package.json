@@ -1,0 +1,20 @@
+{
+  "name": "foldtube",
+  "private": true,
+  "description": "Development tooling for the FoldTube browser extension. The extension itself has no runtime dependencies.",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "node --test \"test/**/*.test.js\"",
+    "package": "./package.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.15.0",
+    "globals": "17.14.0"
+  }
+}
