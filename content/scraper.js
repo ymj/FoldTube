@@ -1,3 +1,8 @@
+// scrapeYouTubeTab is passed to chrome.scripting.executeScript, which
+// serialises the function body and runs it inside the YouTube page. It must
+// stay self-contained: no imports, no references to outer variables. Its video
+// ID and ISO 8601 duration logic therefore duplicates lib/youtube.js; keep the
+// two in step when changing either.
 export function scrapeYouTubeTab() {
   const isShort = window.location.pathname.startsWith('/shorts/');
   const isLive = window.location.pathname.startsWith('/live/');
