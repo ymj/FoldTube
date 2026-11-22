@@ -1,6 +1,7 @@
 /* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
 import { urlToVideoData, parseVideoUrl, parseIsoDuration, formatDuration, mergeVideos } from '../lib/youtube.js';
+import { foldTabs } from '../lib/fold.js';
 
 // ---- State & Storage Setup ----
 
@@ -65,78 +66,72 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
 
 // ---- Manual Collapse (Clicking Extension Icon) ----
 
-async function processAndSaveTabs(tabs) {
-  if (!tabs || tabs.length === 0) return 0;
-
-  const newVideos = [];
-  let closedCount = 0;
-
-  for (const tab of tabs) {
-    try {
-      if (tab.discarded || tab.status === "unloaded") {
-        const videoObj = urlToVideoData(tab.url, tab.title);
-        if (videoObj) {
-          videoObj.metadataSource = 'discarded';
-          newVideos.push(videoObj);
-        }
-      } else {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: scrapeYouTubeTab,
-        });
-        const metadata = results[0]?.result;
-        if (metadata) {
-          try {
-            const durResults = await chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              world: 'MAIN',
-              func: () => {
-                try {
-                  const player = document.querySelector('#movie_player');
-                  if (player && typeof player.getDuration === 'function') {
-                    const data = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
-                    const lengthSec = data?.video_quality_features?.length_seconds
-                      || (typeof player.getDuration === 'function' ? player.getDuration() : 0);
-                    if (typeof ytInitialPlayerResponse !== 'undefined') {
-                      const ls = parseInt(ytInitialPlayerResponse?.videoDetails?.lengthSeconds, 10);
-                      if (ls > 0) return ls;
-                    }
-                    return lengthSec || 0;
-                  }
-                  if (typeof ytInitialPlayerResponse !== 'undefined') {
-                    return parseInt(ytInitialPlayerResponse?.videoDetails?.lengthSeconds, 10) || 0;
-                  }
-                  return 0;
-                } catch (_) { return 0; }
-              },
-            });
-            const realDuration = Math.round(durResults[0]?.result || 0);
-            if (realDuration > 0) {
-              metadata.durationSeconds = realDuration;
-              metadata.durationFormatted = formatDuration(realDuration);
+// Scrape one loaded tab: page metadata, then the real duration from the
+// player (MAIN world) so an ad playing doesn't skew it.
+async function scrapeTab(tab) {
+  const results = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: scrapeYouTubeTab,
+  });
+  const metadata = results[0]?.result;
+  if (!metadata) return null;
+  try {
+    const durResults = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      world: 'MAIN',
+      func: () => {
+        try {
+          const player = document.querySelector('#movie_player');
+          if (player && typeof player.getDuration === 'function') {
+            const data = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
+            const lengthSec = data?.video_quality_features?.length_seconds
+              || (typeof player.getDuration === 'function' ? player.getDuration() : 0);
+            if (typeof ytInitialPlayerResponse !== 'undefined') {
+              const ls = parseInt(ytInitialPlayerResponse?.videoDetails?.lengthSeconds, 10);
+              if (ls > 0) return ls;
             }
-          } catch (_) { /* duration enrichment is best-effort */ }
-          newVideos.push(metadata);
-        }
-      }
-      await chrome.tabs.remove(tab.id);
-      closedCount++;
-    } catch (e) {
-      console.error(`Failed to process tab ${tab.id}:`, e);
+            return lengthSec || 0;
+          }
+          if (typeof ytInitialPlayerResponse !== 'undefined') {
+            return parseInt(ytInitialPlayerResponse?.videoDetails?.lengthSeconds, 10) || 0;
+          }
+          return 0;
+        } catch (_) { return 0; }
+      },
+    });
+    const realDuration = Math.round(durResults[0]?.result || 0);
+    if (realDuration > 0) {
+      metadata.durationSeconds = realDuration;
+      metadata.durationFormatted = formatDuration(realDuration);
     }
-  }
+  } catch (_) { /* duration enrichment is best-effort */ }
+  return metadata;
+}
 
-  if (newVideos.length > 0) {
+// Save folded videos newest first, queued behind any other save in progress.
+function saveFoldedVideos(videos) {
+  const run = savingPromise.then(async () => {
     const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
-    const { merged } = mergeVideos(newVideos, savedVideos);
-
+    const { merged } = mergeVideos(videos, savedVideos);
     await chrome.storage.local.set({ savedVideos: merged });
+  });
+  savingPromise = run.catch(() => {});
+  return run;
+}
 
-    // Automatically try to enrich the missing discarded tabs
-    runEnrichment();
-  }
+// Save first, then close only the tabs that were saved (see lib/fold.js).
+async function processAndSaveTabs(tabs) {
+  if (!tabs || tabs.length === 0) return { closed: 0, leftOpen: 0, saved: 0, saveFailed: false };
 
-  return closedCount;
+  const result = await foldTabs(tabs, {
+    readTab: scrapeTab,
+    save: saveFoldedVideos,
+    closeTab: (tabId) => chrome.tabs.remove(tabId),
+  });
+
+  // Fill in channel and duration for URL-only entries, if an API key is set.
+  if (result.saved > 0) runEnrichment();
+  return result;
 }
 
 async function handleCollapse() {
@@ -147,14 +142,16 @@ async function handleCollapse() {
   ] });
   
   if (tabs.length > 0) {
-    const folded = await processAndSaveTabs(tabs);
+    const { closed, leftOpen } = await processAndSaveTabs(tabs);
+    const message = `Folded ${closed} YouTube tab${closed === 1 ? '' : 's'}`
+      + (leftOpen > 0 ? ` · ${leftOpen} left open` : '');
 
     try {
       chrome.notifications.create("foldtube-collapse", {
         type: "basic",
         iconUrl: chrome.runtime.getURL("icons/icon128.png"),
         title: "FoldTube",
-        message: `Folded ${folded} YouTube tab${folded === 1 ? '' : 's'}`
+        message
       });
     } catch (_) { /* notification is non-critical */ }
   } else {
@@ -225,14 +222,14 @@ async function handleFoldCurrentTab() {
   });
 
   if (tabs.length > 0) {
-    await processAndSaveTabs(tabs);
-    
+    const { closed } = await processAndSaveTabs(tabs);
+
     try {
       chrome.notifications.create("foldtube-collapse-single", {
         type: "basic",
         iconUrl: chrome.runtime.getURL("icons/icon128.png"),
         title: "FoldTube",
-        message: "Folded current YouTube tab!"
+        message: closed > 0 ? "Folded current YouTube tab!" : "Couldn't fold this tab; it was left open."
       });
     } catch (_) { /* notification is non-critical */ }
     
@@ -285,7 +282,8 @@ async function runEnrichment() {
     v.durationSeconds === 0 || 
     v.channelName === "Unknown Channel" || 
     v.metadataSource === "auto-collapsed" || 
-    v.metadataSource === "discarded"
+    v.metadataSource === "discarded" ||
+    v.metadataSource === "url-only"
   );
   
   if (needsEnrichment.length === 0) return;
