@@ -77,26 +77,32 @@
       <!-- First run: nothing has ever been saved. -->
       <div id="empty-first-run" class="empty-copy hidden">
         <h2>Your FoldTube is empty</h2>
-        <p class="empty-when-no-tabs">Open some YouTube videos in your browser, then click the FoldTube icon<span
-            data-shortcut-wrap="_execute_action"> or press <kbd data-shortcut="_execute_action"></kbd></span> to save
-          them here.</p>
+        <p class="empty-when-no-tabs">
+          <span class="line">Open some YouTube videos in your browser.</span>
+          <span class="line">Then click the FoldTube icon<span data-shortcut-wrap="_execute_action"> or press
+              <kbd data-shortcut="_execute_action"></kbd></span> to save them here.</span>
+        </p>
       </div>
 
       <!-- Everything saved has since been watched or removed. -->
       <div id="empty-caught-up" class="empty-copy hidden">
-        <h2>You're all caught up</h2>
-        <p class="empty-when-no-tabs">Next time YouTube tabs pile up, click the FoldTube icon<span
-            data-shortcut-wrap="_execute_action"> or press <kbd data-shortcut="_execute_action"></kbd></span> to save
-          them here.</p>
+        <h2>All caught up</h2>
+        <p class="empty-when-no-tabs">
+          <span class="line">Nothing left to watch in your list.</span>
+          <span class="line">Click the FoldTube icon<span data-shortcut-wrap="_execute_action"> or press
+              <kbd data-shortcut="_execute_action"></kbd></span> anytime to fold new tabs.</span>
+        </p>
       </div>
 
-      <p id="empty-has-tabs" class="hidden">You have <strong id="empty-tab-count"></strong> open. Fold them to save
-        them here and close the tabs.</p>
+      <p id="empty-has-tabs" class="hidden">
+        <span class="line">You have <strong id="empty-tab-count"></strong> open.</span>
+        <span class="line">Fold them to save them here and close the tabs.</span>
+      </p>
 
       <div class="empty-actions">
-        <button id="btn-fold-open-tabs" class="btn-fold hidden"></button>
-        <button id="btn-open-youtube" class="btn-fold">Open YouTube</button>
-        <button id="btn-empty-help" class="link-btn">How FoldTube works</button>
+        <button id="btn-fold-open-tabs" class="btn-pill btn-pill-primary hidden"></button>
+        <button id="btn-open-youtube" class="btn-pill btn-pill-primary">Open YouTube</button>
+        <button id="btn-empty-help" class="btn-pill btn-pill-secondary">How FoldTube works</button>
       </div>
     </div>
 
