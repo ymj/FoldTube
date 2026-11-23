@@ -69,7 +69,7 @@ FoldTube is a powerful YouTube tab manager that helps you take back control of y
 
 ## Optional: YouTube API Enrichment
 
-By default, FoldTube extracts all metadata (title, channel, duration) directly from the page DOM. For tabs that were sleeping, discarded, or auto-collapsed on browser exit, some metadata may be unavailable.
+By default, FoldTube extracts all metadata (title, channel, duration) directly from the page DOM. Tabs that were sleeping, discarded, or auto-collapsed on browser exit can't be read that way. For those, FoldTube asks YouTube's public oEmbed endpoint for the channel name, with no key and no cookies. Duration still needs an API key.
 
 To enable automatic backfilling:
 
@@ -77,7 +77,7 @@ To enable automatic backfilling:
 2. Open FoldTube Settings (`⚙️`) → **API & Enrichment**
 3. Paste your key and click **Save Key**
 
-FoldTube will automatically enrich any cards with missing data in the background. Your API key never leaves your device.
+FoldTube will automatically enrich any cards with missing data in the background. Your API key is stored only on your device and is sent only to Google's YouTube Data API.
 
 ---
 
@@ -97,7 +97,10 @@ Your preference is saved locally and applied immediately on every page load with
 
 ## Privacy
 
-FoldTube collects **no user data**. Everything is stored locally on your device using `chrome.storage.local`. No analytics, no telemetry, no external servers — unless you optionally enable the YouTube API enrichment feature using your own key, in which case your browser communicates directly with Google's servers.
+FoldTube collects **no user data**. Everything is stored locally on your device using `chrome.storage.local`. No analytics, no telemetry, no FoldTube servers. FoldTube talks only to YouTube and Google, directly from your browser:
+
+- **Channel names:** for saved videos with no channel (saved on window close or from a sleeping tab), FoldTube sends the video ID to YouTube's oEmbed endpoint (`youtube.com/oembed`), without cookies.
+- **API enrichment (optional):** if you add your own YouTube Data API key, video IDs and the key go to Google's API to fill in channel and duration.
 
 ---
 

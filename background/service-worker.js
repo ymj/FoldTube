@@ -3,6 +3,7 @@ import { scrapeYouTubeTab } from '../content/scraper.js';
 import { parseVideoUrl, parseIsoDuration, formatDuration } from '../lib/youtube.js';
 import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
+import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults } from '../lib/oembed.js';
 
 // ---- Saved videos: single owner ----
 
@@ -72,6 +73,7 @@ const sessionReady = enqueueSnapshot(async () => {
   if (recovered.length) {
     const { added } = await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: recovered }));
     console.log(`FoldTube: saved ${added} tab(s) left open when the browser last closed.`);
+    fillInMetadata();
   }
 
   // A video saved on window close whose tab the browser restored is a
@@ -105,7 +107,10 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
     if (removeInfo.isWindowClosing) {
       const { settings = {} } = await chrome.storage.local.get("settings");
       const video = autoCollapseVideo(removeInfo, settings, entry);
-      if (video) await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
+      if (video) {
+        await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
+        fillInMetadata();
+      }
     }
 
     // Saved, or closed on purpose: no longer a candidate.
@@ -173,8 +178,8 @@ async function processAndSaveTabs(tabs) {
     closeTab: (tabId) => chrome.tabs.remove(tabId),
   });
 
-  // Fill in channel and duration for URL-only entries, if an API key is set.
-  if (result.saved > 0) runEnrichment();
+  // Fill in channel (and, with an API key, duration) for URL-only entries.
+  if (result.saved > 0) fillInMetadata();
   return result;
 }
 
@@ -230,12 +235,64 @@ async function handleFoldCurrentTab() {
   }
 }
 
-// ---- Startup enrichment ----
+// ---- Filling in metadata ----
 
 chrome.runtime.onStartup.addListener(async () => {
   await sessionReady;
-  await runEnrichment();
+  await fillInMetadata();
 });
+
+// API enrichment first (it also fills duration), then oEmbed for any channel
+// still unknown. One run at a time; a request made while a run is waiting to
+// start is covered by that run.
+const enqueueMetadata = createSerialQueue();
+let metadataRunWaiting = null;
+
+function fillInMetadata() {
+  if (metadataRunWaiting) return metadataRunWaiting;
+  metadataRunWaiting = enqueueMetadata(async () => {
+    metadataRunWaiting = null;
+    await runEnrichment();
+    await runChannelLookup();
+  }).catch(e => console.error("FoldTube: filling in metadata failed", e));
+  return metadataRunWaiting;
+}
+
+// Channel names without an API key (see lib/oembed.js). Requests go one at a
+// time and carry no cookies. Offline, rate-limited or a server error: stop
+// and try again on a later run.
+async function runChannelLookup() {
+  const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
+  const ids = videoIdsForLookup(savedVideos);
+  let results = new Map();
+  const flush = async () => {
+    if (!results.size) return;
+    const batch = results;
+    results = new Map();
+    await mutateSavedVideos(videos => applyOembedResults(videos, batch));
+  };
+
+  try {
+    for (const id of ids) {
+      let resp;
+      try {
+        resp = await fetch(oembedUrl(id), { credentials: "omit" });
+      } catch (_) {
+        return; // offline
+      }
+      const outcome = classifyOembedStatus(resp.status);
+      if (outcome === "retry") return;
+      let data = null;
+      if (outcome === "ok") {
+        try { data = await resp.json(); } catch (_) { return; } // garbled: retry later
+      }
+      results.set(id, data);
+      if (results.size >= 10) await flush();
+    }
+  } finally {
+    await flush();
+  }
+}
 
 async function runEnrichment() {
   const { settings = {} } = await chrome.storage.local.get("settings");
@@ -304,7 +361,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return;
 
   if (request.action === "runEnrichment") {
-    runEnrichment();
+    fillInMetadata();
     return;
   }
 
