@@ -95,12 +95,49 @@ Your preference is saved locally and applied immediately on every page load with
 
 ---
 
-## Privacy
+## Privacy Policy
 
-FoldTube collects **no user data**. Everything is stored locally on your device using `chrome.storage.local`. No analytics, no telemetry, no FoldTube servers. FoldTube talks only to YouTube and Google, directly from your browser:
+*Last updated: November 23, 2026*
 
-- **Channel names:** for saved videos with no channel (saved on window close or from a sleeping tab), FoldTube sends the video ID to YouTube's oEmbed endpoint (`youtube.com/oembed`), without cookies.
-- **API enrichment (optional):** if you add your own YouTube Data API key, video IDs and the key go to Google's API to fill in channel and duration.
+FoldTube is built to keep what you watch private. In short: your list stays in your browser, and FoldTube has no servers, accounts, ads, analytics, cookies or tracking. Nothing is ever sent to the developer.
+
+### What FoldTube keeps, and where
+
+Everything below is stored in your browser, on your device. It isn't synced, and it isn't sent to the developer.
+
+- **The videos you save:** the title, channel, length, link and thumbnail of each video, and the date you saved it.
+- **Your settings:** theme, auto-collapse, and your YouTube API key if you choose to add one.
+- **Your open YouTube video tabs:** FoldTube keeps a short list of the YouTube videos open in your browser, so they can still be saved if the browser quits while auto-collapse is on. A tab drops off the list when you close it or leave YouTube.
+
+### What FoldTube sends, and to whom
+
+FoldTube talks only to YouTube and Google, directly from your browser:
+
+- **YouTube, for channel names.** When a saved video has no channel name (for example, it was saved from a sleeping tab), FoldTube asks YouTube for it using the video's ID. These requests carry no cookies and aren't linked to your YouTube account.
+- **Google's YouTube Data API, only if you add a key.** FoldTube then sends video IDs and your key to Google to fill in channel names and lengths. You can remove the key at any time in Settings → Advanced.
+- **YouTube itself, when you open a video.** Opening a video, or YouTube, loads it in a normal browser tab, just as if you had clicked a link. YouTube's own privacy policy applies there.
+
+FoldTube doesn't sell or share your data, and doesn't use it for anything other than the features above.
+
+### What FoldTube can access
+
+- **youtube.com:** to find your open YouTube video tabs, and to read a video's title, channel and length from its page when you fold it. FoldTube can't see other websites.
+- **Storage:** to keep your list and settings in your browser.
+- **Notifications:** to tell you how many tabs were folded.
+
+### Your choices
+
+- **Remove videos** from your list at any time, one by one or all at once.
+- **Export** your list as a JSON or HTML file. The file is saved on your computer, and FoldTube doesn't upload it.
+- **Uninstall** FoldTube to delete everything it stored, all at once.
+
+### Changes to this policy
+
+If FoldTube ever adds a feature that changes any of this, such as syncing across devices, this policy will be updated first, with a new date at the top.
+
+### Contact
+
+Questions about privacy: [hello@osumapps.com](mailto:hello@osumapps.com)
 
 ---
 
