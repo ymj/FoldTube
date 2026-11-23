@@ -165,7 +165,7 @@ function showUndoToast(message, restoreFn) {
 
 // Fill a list with the shortcuts as currently bound (Settings and Help).
 // Short labels, so the three fit side by side.
-const SHORT_LABELS = { '_execute_action': 'Fold all', 'fold-current-tab': 'Fold this tab', 'open-dashboard': 'Dashboard' };
+const SHORT_LABELS = { '_execute_action': 'Fold all tabs', 'fold-current-tab': 'Fold this tab', 'open-dashboard': 'Dashboard' };
 
 async function renderShortcuts(list) {
   let rows;
