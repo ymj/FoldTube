@@ -17,7 +17,8 @@
     </div>
     <div class="header-controls" style="display: flex; align-items: center;">
       <span class="video-count">0 items</span>
-      <button id="btn-settings" class="settings-btn" title="Settings">⚙️</button>
+      <button id="btn-help" class="help-btn" title="Help" aria-label="Help">?</button>
+      <button id="btn-settings" class="settings-btn" title="Settings" aria-label="Settings">⚙️</button>
     </div>
   </header>
 
@@ -78,88 +79,109 @@
     </div>
   </main>
 
-  <dialog id="settings-modal" class="modal">
+  <dialog id="settings-modal" class="modal" aria-labelledby="settings-title">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Settings</h2>
-        <button id="btn-close-settings" class="close-btn">&times;</button>
+        <h2 id="settings-title">Settings</h2>
+        <button id="btn-close-settings" class="close-btn" aria-label="Close Settings">&times;</button>
+      </div>
+      <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+        <button id="tab-general" class="settings-tab" role="tab" aria-selected="true" aria-controls="panel-general">General</button>
+        <button id="tab-advanced" class="settings-tab" role="tab" aria-selected="false" aria-controls="panel-advanced" tabindex="-1">Advanced</button>
       </div>
       <div class="modal-body">
 
-        <div class="setting-group">
-          <h3>Appearance</h3>
-          <div class="setting-item toggle-item">
-            <div class="setting-text">
-              <label for="theme-select">Color Theme</label>
-              <p>Choose how FoldTube looks. &ldquo;System&rdquo; follows your OS preference.</p>
+        <div id="panel-general" class="settings-panel" role="tabpanel" aria-labelledby="tab-general">
+          <div class="setting-group">
+            <div class="setting-item toggle-item">
+              <div class="setting-text">
+                <label for="theme-select">Color Theme</label>
+                <p>&ldquo;System&rdquo; follows your OS preference.</p>
+              </div>
+              <select id="theme-select" class="theme-select">
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
             </div>
-            <select id="theme-select" class="theme-select">
-              <option value="system">System</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
+            <div class="setting-item toggle-item">
+              <div class="setting-text">
+                <label for="auto-collapse-toggle">Auto-Collapse YouTube Tabs on Exit</label>
+                <p>Save your open YouTube tabs into FoldTube when you close a window or quit the browser.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="auto-collapse-toggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <h3>Keyboard Shortcuts</h3>
+            <ul id="shortcut-list" class="shortcut-list" aria-label="Keyboard shortcuts"></ul>
+            <div class="setting-actions">
+              <button id="btn-change-shortcuts" class="btn-secondary">Change shortcuts</button>
+            </div>
+            <p id="shortcut-hint" class="shortcut-hint hidden">
+              To change them, open <strong>about:addons</strong>, click the gear icon, then
+              <strong>Manage Extension Shortcuts</strong>.
+            </p>
           </div>
         </div>
 
-        <div class="setting-group">
-          <h3>General</h3>
-          <div class="setting-item toggle-item">
-            <div class="setting-text">
-              <label for="auto-collapse-toggle">Auto-Collapse YouTube Tabs on Exit</label>
-              <p>Automatically save your open YouTube tabs into FoldTube when closing the browser window.</p>
+        <div id="panel-advanced" class="settings-panel" role="tabpanel" aria-labelledby="tab-advanced" hidden>
+          <div class="setting-group">
+            <h3>API &amp; Enrichment</h3>
+            <div class="setting-item">
+              <label for="api-key-input">YouTube Data API key (optional)</label>
+              <p>Fills in missing durations, and channel names YouTube won't share without a key, for videos saved from
+                sleeping or closed tabs.</p>
+              <input type="password" id="api-key-input" placeholder="Paste YouTube Data API Key here...">
+              <div style="display: flex; gap: 8px;">
+                <button id="btn-save-api" class="btn-primary">Save Key</button>
+                <button id="btn-clear-api" class="btn-secondary hidden" title="Remove the current API key">Clear</button>
+              </div>
             </div>
-            <label class="switch">
-              <input type="checkbox" id="auto-collapse-toggle">
-              <span class="slider"></span>
-            </label>
+          </div>
+
+          <div class="setting-group">
+            <h3>Backup &amp; Restore</h3>
+            <p>Save a copy of your library, or restore one you saved earlier.</p>
+            <div class="setting-actions">
+              <button id="btn-export" class="btn-secondary">Export to JSON</button>
+              <button id="btn-export-html" class="btn-secondary">Export to HTML</button>
+              <button id="btn-import-trigger" class="btn-secondary">Import from JSON</button>
+              <input type="file" id="import-file" accept=".json" class="hidden">
+            </div>
           </div>
         </div>
 
-        <div class="setting-group">
-          <h3>API & Enrichment</h3>
-          <div class="setting-item">
-            <label for="api-key-input">Enable Data Enrichment</label>
-            <p>Link a YouTube Data API v3 key to magically backfill missing channel names and correct video durations
-              for sleeping/auto-collapsed tabs.</p>
-            <input type="password" id="api-key-input" placeholder="Paste YouTube Data API Key here...">
-            <div style="display: flex; gap: 8px;">
-              <button id="btn-save-api" class="btn-primary">Save Key</button>
-              <button id="btn-clear-api" class="btn-secondary hidden" title="Remove the current API key">Clear</button>
-            </div>
-          </div>
-        </div>
+      </div>
+    </div>
+  </dialog>
 
+  <dialog id="help-modal" class="modal" aria-labelledby="help-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="help-title">Help</h2>
+        <button id="btn-close-help" class="close-btn" aria-label="Close Help">&times;</button>
+      </div>
+      <div class="modal-body">
         <div class="setting-group">
-          <h3>Keyboard Shortcuts</h3>
-          <ul id="shortcut-list" class="shortcut-list" aria-label="Keyboard shortcuts"></ul>
-          <div class="setting-actions">
-            <button id="btn-change-shortcuts" class="btn-secondary">Change shortcuts</button>
-          </div>
-          <p id="shortcut-hint" class="shortcut-hint hidden">
-            To change them, open <strong>about:addons</strong>, click the gear icon, then
-            <strong>Manage Extension Shortcuts</strong>.
-          </p>
-          <h4 class="setting-subheading">In the dashboard</h4>
+          <h3>Keyboard shortcuts</h3>
+          <ul id="help-shortcut-list" class="shortcut-list" aria-label="Keyboard shortcuts"></ul>
+          <p class="shortcut-hint">You can change these in <button id="btn-help-to-settings" class="link-btn">Settings</button>.</p>
+        </div>
+        <div class="setting-group">
+          <h3>In the dashboard</h3>
           <ul class="shortcut-list" aria-label="Dashboard actions">
             <li><span class="shortcut-label">Open a video</span><span class="shortcut-keys">Click its card</span></li>
             <li><span class="shortcut-label">Select several videos</span><span class="shortcut-keys">Tick the box on each card</span></li>
             <li><span class="shortcut-label">Remove a video</span><span class="shortcut-keys">Click <kbd>&times;</kbd> on its card</span></li>
             <li><span class="shortcut-label">Remove the selected videos</span><span class="shortcut-keys"><kbd>Delete</kbd></span></li>
-            <li><span class="shortcut-label">Close Settings</span><span class="shortcut-keys"><kbd>Esc</kbd></span></li>
+            <li><span class="shortcut-label">Undo a removal</span><span class="shortcut-keys">Click <strong>Undo</strong> in the message</span></li>
           </ul>
         </div>
-
-        <div class="setting-group">
-          <h3>Data Manager</h3>
-          <p>Create a localized backup of your Foldtube dashboard or restore an older save state.</p>
-          <div class="setting-actions">
-            <button id="btn-export" class="btn-secondary">Export to JSON</button>
-            <button id="btn-export-html" class="btn-secondary">Export to HTML</button>
-            <button id="btn-import-trigger" class="btn-secondary">Import from JSON</button>
-            <input type="file" id="import-file" accept=".json" class="hidden">
-          </div>
-        </div>
-
       </div>
     </div>
   </dialog>

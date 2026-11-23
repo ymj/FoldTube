@@ -163,8 +163,8 @@ function showUndoToast(message, restoreFn) {
 
 // ---- Keyboard Shortcuts (Settings) ----
 
-async function renderShortcuts() {
-  const list = document.getElementById('shortcut-list');
+// Fill a list with the shortcuts as currently bound (Settings and Help).
+async function renderShortcuts(list) {
   let rows;
   try {
     const [commands, { os }] = await Promise.all([chrome.commands.getAll(), chrome.runtime.getPlatformInfo()]);
@@ -195,6 +195,32 @@ async function renderShortcuts() {
   list.replaceChildren(...items);
 }
 
+// Settings tabs: General (everyday) and Advanced (API key, backup).
+const SETTINGS_TABS = ['general', 'advanced'];
+
+function selectSettingsTab(name) {
+  for (const tab of SETTINGS_TABS) {
+    const selected = tab === name;
+    const button = document.getElementById(`tab-${tab}`);
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    document.getElementById(`panel-${tab}`).hidden = !selected;
+  }
+}
+
+function bindSettingsTabs() {
+  SETTINGS_TABS.forEach((tab, i) => {
+    const button = document.getElementById(`tab-${tab}`);
+    button.addEventListener('click', () => selectSettingsTab(tab));
+    button.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const next = SETTINGS_TABS[(i + (e.key === 'ArrowRight' ? 1 : SETTINGS_TABS.length - 1)) % SETTINGS_TABS.length];
+      selectSettingsTab(next);
+      document.getElementById(`tab-${next}`).focus();
+    });
+  });
+}
+
 // Chrome, Brave and Edge have a shortcuts page; Firefox opens its own.
 async function openShortcutSettings() {
   const hint = document.getElementById('shortcut-hint');
@@ -218,10 +244,24 @@ async function openShortcutSettings() {
 function bindControls() {
   // Settings Modal
   const settingsModal = document.getElementById('settings-modal');
-  document.getElementById('btn-settings').addEventListener('click', () => {
-    renderShortcuts(); // re-read: bindings may have changed since last time
+  const helpModal = document.getElementById('help-modal');
+  // Bindings are re-read each time: they may have changed since last time.
+  const openSettings = () => {
+    selectSettingsTab('general');
+    renderShortcuts(document.getElementById('shortcut-list'));
     settingsModal.showModal();
+  };
+  document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('btn-help').addEventListener('click', () => {
+    renderShortcuts(document.getElementById('help-shortcut-list'));
+    helpModal.showModal();
   });
+  document.getElementById('btn-close-help').addEventListener('click', () => helpModal.close());
+  document.getElementById('btn-help-to-settings').addEventListener('click', () => {
+    helpModal.close();
+    openSettings();
+  });
+  bindSettingsTabs();
   document.getElementById('btn-change-shortcuts').addEventListener('click', openShortcutSettings);
   document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.close());
 
@@ -229,6 +269,7 @@ function bindControls() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (settingsModal.open) { settingsModal.close(); return; }
+      if (helpModal.open) { helpModal.close(); return; }
     }
     if (e.key === 'Delete' && selectedVideoIds.size > 0 && document.activeElement.tagName !== 'INPUT') {
       document.getElementById('btn-delete-selected').click();

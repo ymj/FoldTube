@@ -456,6 +456,27 @@ body {
   filter: grayscale(0);
 }
 
+.help-btn {
+  width: 28px;
+  height: 28px;
+  margin-left: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--text-secondary);
+  background: none;
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.help-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
 /* ════════════════════════════════════════
    Modal
    ════════════════════════════════════════ */
@@ -508,6 +529,43 @@ body {
 
 .modal-body {
   padding: 24px;
+}
+
+/* Settings tabs */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.settings-tab:hover {
+  color: var(--text-primary);
+}
+
+.settings-tab[aria-selected="true"] {
+  color: var(--text-primary);
+  border-bottom-color: var(--text-primary);
+}
+
+.setting-group:last-child {
+  margin-bottom: 0;
+}
+
+.setting-item + .setting-item {
+  margin-top: 16px;
 }
 
 .setting-group {
@@ -618,11 +676,14 @@ body {
   line-height: 1.4;
 }
 
-.setting-subheading {
-  margin: 20px 0 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-primary);
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--selection-color);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .btn-primary {
