@@ -222,8 +222,8 @@ function bindSettingsTabs() {
 }
 
 // Chrome, Brave and Edge have a shortcuts page; Firefox opens its own.
-async function openShortcutSettings() {
-  const hint = document.getElementById('shortcut-hint');
+// If neither works, show the written steps in `hint`.
+async function openShortcutSettings(hint) {
   if (typeof chrome.commands.openShortcutSettings === 'function') {
     try {
       await chrome.commands.openShortcutSettings();
@@ -257,12 +257,11 @@ function bindControls() {
     helpModal.showModal();
   });
   document.getElementById('btn-close-help').addEventListener('click', () => helpModal.close());
-  document.getElementById('btn-help-to-settings').addEventListener('click', () => {
-    helpModal.close();
-    openSettings();
-  });
+  document.getElementById('btn-help-change-shortcuts')
+    .addEventListener('click', () => openShortcutSettings(document.getElementById('help-shortcut-hint')));
   bindSettingsTabs();
-  document.getElementById('btn-change-shortcuts').addEventListener('click', openShortcutSettings);
+  document.getElementById('btn-change-shortcuts')
+    .addEventListener('click', () => openShortcutSettings(document.getElementById('shortcut-hint')));
   document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.close());
 
   // Keyboard shortcuts

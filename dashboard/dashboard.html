@@ -170,7 +170,13 @@
         <div class="setting-group">
           <h3>Keyboard shortcuts</h3>
           <ul id="help-shortcut-list" class="shortcut-list" aria-label="Keyboard shortcuts"></ul>
-          <p class="shortcut-hint">You can change these in <button id="btn-help-to-settings" class="link-btn">Settings</button>.</p>
+          <div class="setting-actions">
+            <button id="btn-help-change-shortcuts" class="btn-secondary">Change shortcuts</button>
+          </div>
+          <p id="help-shortcut-hint" class="shortcut-hint hidden">
+            To change them, open <strong>about:addons</strong>, click the gear icon, then
+            <strong>Manage Extension Shortcuts</strong>.
+          </p>
         </div>
         <div class="setting-group">
           <h3>In the dashboard</h3>
