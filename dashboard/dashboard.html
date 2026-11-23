@@ -130,6 +130,26 @@
         </div>
 
         <div class="setting-group">
+          <h3>Keyboard Shortcuts</h3>
+          <ul id="shortcut-list" class="shortcut-list" aria-label="Keyboard shortcuts"></ul>
+          <div class="setting-actions">
+            <button id="btn-change-shortcuts" class="btn-secondary">Change shortcuts</button>
+          </div>
+          <p id="shortcut-hint" class="shortcut-hint hidden">
+            To change them, open <strong>about:addons</strong>, click the gear icon, then
+            <strong>Manage Extension Shortcuts</strong>.
+          </p>
+          <h4 class="setting-subheading">In the dashboard</h4>
+          <ul class="shortcut-list" aria-label="Dashboard actions">
+            <li><span class="shortcut-label">Open a video</span><span class="shortcut-keys">Click its card</span></li>
+            <li><span class="shortcut-label">Select several videos</span><span class="shortcut-keys">Tick the box on each card</span></li>
+            <li><span class="shortcut-label">Remove a video</span><span class="shortcut-keys">Click <kbd>&times;</kbd> on its card</span></li>
+            <li><span class="shortcut-label">Remove the selected videos</span><span class="shortcut-keys"><kbd>Delete</kbd></span></li>
+            <li><span class="shortcut-label">Close Settings</span><span class="shortcut-keys"><kbd>Esc</kbd></span></li>
+          </ul>
+        </div>
+
+        <div class="setting-group">
           <h3>Data Manager</h3>
           <p>Create a localized backup of your Foldtube dashboard or restore an older save state.</p>
           <div class="setting-actions">

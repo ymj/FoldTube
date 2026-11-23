@@ -567,6 +567,64 @@ body {
   flex-wrap: wrap;
 }
 
+/* Keyboard Shortcuts */
+.shortcut-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.shortcut-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.shortcut-list li:last-child {
+  border-bottom: none;
+}
+
+.shortcut-keys {
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.shortcut-list kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 2px 8px;
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  text-align: center;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+}
+
+.shortcut-list .shortcut-unset {
+  font-style: italic;
+}
+
+.shortcut-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+.setting-subheading {
+  margin: 20px 0 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .btn-primary {
   background-color: var(--text-primary);
   color: var(--bg-color);

@@ -1,4 +1,5 @@
 import { validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor } from '../lib/youtube.js';
+import { describeShortcuts } from '../lib/shortcuts.js';
 
 let allVideos = [];
 let selectedVideoIds = new Set();
@@ -160,11 +161,68 @@ function showUndoToast(message, restoreFn) {
   }, 5000);
 }
 
+// ---- Keyboard Shortcuts (Settings) ----
+
+async function renderShortcuts() {
+  const list = document.getElementById('shortcut-list');
+  let rows;
+  try {
+    const [commands, { os }] = await Promise.all([chrome.commands.getAll(), chrome.runtime.getPlatformInfo()]);
+    rows = describeShortcuts(commands, os);
+  } catch (e) {
+    console.error('FoldTube: could not read shortcuts', e);
+    rows = describeShortcuts([], '');
+  }
+
+  const items = rows.map(({ label, keys, isSet }) => {
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    name.className = 'shortcut-label';
+    name.textContent = label;
+    const value = document.createElement('span');
+    value.className = 'shortcut-keys';
+    if (isSet) {
+      const kbd = document.createElement('kbd');
+      kbd.textContent = keys;
+      value.appendChild(kbd);
+    } else {
+      value.classList.add('shortcut-unset');
+      value.textContent = keys;
+    }
+    li.append(name, value);
+    return li;
+  });
+  list.replaceChildren(...items);
+}
+
+// Chrome, Brave and Edge have a shortcuts page; Firefox opens its own.
+async function openShortcutSettings() {
+  const hint = document.getElementById('shortcut-hint');
+  if (typeof chrome.commands.openShortcutSettings === 'function') {
+    try {
+      await chrome.commands.openShortcutSettings();
+      return;
+    } catch (_) {
+      hint.classList.remove('hidden');
+      return;
+    }
+  }
+  try {
+    await chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  } catch (_) {
+    hint.classList.remove('hidden');
+  }
+}
+
 // ---- Controls ----
 function bindControls() {
   // Settings Modal
   const settingsModal = document.getElementById('settings-modal');
-  document.getElementById('btn-settings').addEventListener('click', () => settingsModal.showModal());
+  document.getElementById('btn-settings').addEventListener('click', () => {
+    renderShortcuts(); // re-read: bindings may have changed since last time
+    settingsModal.showModal();
+  });
+  document.getElementById('btn-change-shortcuts').addEventListener('click', openShortcutSettings);
   document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.close());
 
   // Keyboard shortcuts
