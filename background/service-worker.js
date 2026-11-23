@@ -4,6 +4,7 @@ import { parseVideoUrl, parseIsoDuration, formatDuration, YOUTUBE_TAB_PATTERNS }
 import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
 import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults } from '../lib/oembed.js';
+import { menuItems, linkToVideo, MENU_FOLD_TAB, MENU_SAVE_LINK } from '../lib/contextmenu.js';
 
 // ---- Saved videos: single owner ----
 
@@ -221,13 +222,49 @@ chrome.commands.onCommand.addListener((command) => {
 
 async function handleFoldCurrentTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true, url: YOUTUBE_TAB_PATTERNS });
+  if (tabs.length > 0) await foldOneTab(tabs[0]);
+}
 
-  if (tabs.length > 0) {
-    const { closed } = await processAndSaveTabs(tabs);
-    notify("foldtube-collapse-single",
-      closed > 0 ? "Folded current YouTube tab!" : "Couldn't fold this tab; it was left open.");
-    await handleOpenDashboard();
+// The keyboard shortcut and the "Fold this tab" menu.
+async function foldOneTab(tab) {
+  const { closed } = await processAndSaveTabs([tab]);
+  notify("foldtube-collapse-single",
+    closed > 0 ? "Folded current YouTube tab!" : "Couldn't fold this tab; it was left open.");
+  await handleOpenDashboard();
+}
+
+// ---- Right-click menus ----
+
+// Chrome keeps menus across restarts; Firefox may not. Clearing first means
+// creating them again never duplicates them.
+async function createMenus() {
+  try {
+    await chrome.contextMenus.removeAll();
+    for (const item of menuItems()) chrome.contextMenus.create(item);
+  } catch (e) {
+    console.error("FoldTube: failed to create menus", e);
   }
+}
+
+chrome.runtime.onInstalled.addListener(createMenus);
+chrome.runtime.onStartup.addListener(createMenus);
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === MENU_FOLD_TAB && tab?.id !== undefined && parseVideoUrl(tab.url)) {
+    foldOneTab(tab);
+  } else if (info.menuItemId === MENU_SAVE_LINK) {
+    saveLink(info.linkUrl);
+  }
+});
+
+// Save a linked video without opening it. Its title and channel are filled
+// in afterwards.
+async function saveLink(linkUrl) {
+  const video = linkToVideo(linkUrl);
+  if (!video) return;
+  const { added } = await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
+  notify("foldtube-save-link", added ? "Saved to FoldTube" : "Already in FoldTube");
+  if (added) fillInMetadata();
 }
 
 // ---- Filling in metadata ----

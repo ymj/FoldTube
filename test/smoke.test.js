@@ -20,7 +20,7 @@ test('scraper module exports scrapeYouTubeTab', async () => {
 });
 
 test('manifest asks only for the permissions FoldTube needs', () => {
-  assert.deepEqual([...manifest.permissions].sort(), ['notifications', 'scripting', 'storage']);
+  assert.deepEqual([...manifest.permissions].sort(), ['contextMenus', 'notifications', 'scripting', 'storage']);
   assert.deepEqual(manifest.host_permissions, ['*://*.youtube.com/*']);
 });
 

@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "scripting",
-    "notifications"
+    "notifications",
+    "contextMenus"
   ],
   "host_permissions": [
     "*://*.youtube.com/*"

@@ -883,7 +883,8 @@ body {
   flex-wrap: wrap;
 }
 
-.shortcut-hint {
+.shortcut-hint,
+.right-click-note {
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin: 8px 0 0;
