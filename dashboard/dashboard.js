@@ -1,4 +1,5 @@
 import { validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor } from '../lib/youtube.js';
+import { describeShortcuts } from '../lib/shortcuts.js';
 
 let allVideos = [];
 let selectedVideoIds = new Set();
@@ -160,17 +161,165 @@ function showUndoToast(message, restoreFn) {
   }, 5000);
 }
 
+// ---- Keyboard Shortcuts (Settings) ----
+
+// Fill a list with the shortcuts as currently bound (Settings and Help).
+// Short labels, so the three fit side by side.
+const SHORT_LABELS = { '_execute_action': 'Fold all tabs', 'fold-current-tab': 'Fold this tab', 'open-dashboard': 'Dashboard' };
+
+async function renderShortcuts(list) {
+  let rows;
+  try {
+    const [commands, { os }] = await Promise.all([chrome.commands.getAll(), chrome.runtime.getPlatformInfo()]);
+    rows = describeShortcuts(commands, os);
+  } catch (e) {
+    console.error('FoldTube: could not read shortcuts', e);
+    rows = describeShortcuts([], '');
+  }
+
+  const items = rows.map(({ name: command, label, keys, isSet }) => {
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    name.className = 'shortcut-label';
+    name.textContent = SHORT_LABELS[command] || label;
+    const value = document.createElement('span');
+    value.className = 'shortcut-keys';
+    if (isSet) {
+      const kbd = document.createElement('kbd');
+      kbd.textContent = keys;
+      value.appendChild(kbd);
+    } else {
+      value.classList.add('shortcut-unset');
+      value.textContent = keys;
+    }
+    li.append(name, value);
+    return li;
+  });
+  list.replaceChildren(...items);
+  fitShortcutsCard(list.closest('.shortcuts-card'));
+
+  // Keys mentioned in running text (Help's first answer).
+  const keysByCommand = new Map(rows.map(r => [r.name, r]));
+  document.querySelectorAll('[data-shortcut]').forEach(el => {
+    const row = keysByCommand.get(el.dataset.shortcut);
+    el.textContent = row?.isSet ? row.keys : 'no shortcut set';
+  });
+}
+
+// Version in the Settings and Help footers; Firefox-only help where it applies.
+function fillAboutInfo() {
+  const { version, description } = chrome.runtime.getManifest();
+  document.querySelectorAll('.app-version').forEach(el => { el.textContent = version; });
+  document.querySelectorAll('.app-description').forEach(el => { el.textContent = description; });
+  // getBrowserInfo exists only in Firefox.
+  if (typeof chrome.runtime.getBrowserInfo === 'function') {
+    document.getElementById('faq-firefox').hidden = false;
+  }
+}
+
+// Settings tabs: General (everyday) and Advanced (API key, backup).
+const SETTINGS_TABS = ['general', 'advanced'];
+
+function selectSettingsTab(name) {
+  for (const tab of SETTINGS_TABS) {
+    const selected = tab === name;
+    const button = document.getElementById(`tab-${tab}`);
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    document.getElementById(`panel-${tab}`).hidden = !selected;
+  }
+}
+
+function bindSettingsTabs() {
+  SETTINGS_TABS.forEach((tab, i) => {
+    const button = document.getElementById(`tab-${tab}`);
+    button.addEventListener('click', () => selectSettingsTab(tab));
+    button.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const next = SETTINGS_TABS[(i + (e.key === 'ArrowRight' ? 1 : SETTINGS_TABS.length - 1)) % SETTINGS_TABS.length];
+      selectSettingsTab(next);
+      document.getElementById(`tab-${next}`).focus();
+    });
+  });
+}
+
+// Side by side when the shortcuts fit, stacked when they don't. Every key
+// gets the width of the widest one, so they line up either way.
+function fitShortcutsCard(card) {
+  if (!card || !card.isConnected) return;
+  const list = card.querySelector('.shortcut-keys-list');
+  const keys = [...list.querySelectorAll('kbd')];
+  keys.forEach(k => { k.style.minWidth = ''; });
+  const widest = Math.ceil(Math.max(0, ...keys.map(k => k.getBoundingClientRect().width)));
+  if (widest > 0) keys.forEach(k => { k.style.minWidth = `${widest}px`; });
+
+  card.classList.remove('stacked');
+  if (list.scrollWidth > list.clientWidth) card.classList.add('stacked');
+}
+
+// Re-check when the card's width changes (window resized, dialog opened).
+// The re-check changes the card's own layout, so it runs on the next frame,
+// outside the observer callback; otherwise the browser reports a
+// "ResizeObserver loop" error. Height changes from stacking are ignored.
+const shortcutsCardObserver = new ResizeObserver(entries => {
+  for (const { target, contentRect } of entries) {
+    const width = String(Math.round(contentRect.width));
+    if (target.dataset.width === width) continue;
+    target.dataset.width = width;
+    requestAnimationFrame(() => fitShortcutsCard(target));
+  }
+});
+document.querySelectorAll('.shortcuts-card').forEach(card => shortcutsCardObserver.observe(card));
+
+// Chrome, Brave and Edge have a shortcuts page; Firefox opens its own.
+// If neither works, show the written steps in `hint`.
+async function openShortcutSettings(hint) {
+  if (typeof chrome.commands.openShortcutSettings === 'function') {
+    try {
+      await chrome.commands.openShortcutSettings();
+      return;
+    } catch (_) {
+      hint.classList.remove('hidden');
+      return;
+    }
+  }
+  try {
+    await chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  } catch (_) {
+    hint.classList.remove('hidden');
+  }
+}
+
 // ---- Controls ----
 function bindControls() {
   // Settings Modal
   const settingsModal = document.getElementById('settings-modal');
-  document.getElementById('btn-settings').addEventListener('click', () => settingsModal.showModal());
+  const helpModal = document.getElementById('help-modal');
+  // Bindings are re-read each time: they may have changed since last time.
+  const openSettings = () => {
+    selectSettingsTab('general');
+    renderShortcuts(document.getElementById('shortcut-list'));
+    settingsModal.showModal();
+  };
+  document.getElementById('btn-settings').addEventListener('click', openSettings);
+  document.getElementById('btn-help').addEventListener('click', () => {
+    renderShortcuts(document.getElementById('help-shortcut-list'));
+    helpModal.showModal();
+  });
+  document.getElementById('btn-close-help').addEventListener('click', () => helpModal.close());
+  document.getElementById('btn-help-change-shortcuts')
+    .addEventListener('click', () => openShortcutSettings(document.getElementById('help-shortcut-hint')));
+  bindSettingsTabs();
+  fillAboutInfo();
+  document.getElementById('btn-change-shortcuts')
+    .addEventListener('click', () => openShortcutSettings(document.getElementById('shortcut-hint')));
   document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.close());
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (settingsModal.open) { settingsModal.close(); return; }
+      if (helpModal.open) { helpModal.close(); return; }
     }
     if (e.key === 'Delete' && selectedVideoIds.size > 0 && document.activeElement.tagName !== 'INPUT') {
       document.getElementById('btn-delete-selected').click();
