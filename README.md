@@ -125,12 +125,6 @@ FoldTube doesn't sell or share your data, and doesn't use it for anything other 
 - **Storage:** to keep your list and settings in your browser.
 - **Notifications:** to tell you how many tabs were folded.
 
-### Your choices
-
-- **Remove videos** from your list at any time, one by one or all at once.
-- **Export** your list as a JSON or HTML file. The file is saved on your computer, and FoldTube doesn't upload it.
-- **Uninstall** FoldTube to delete everything it stored, all at once.
-
 ### Changes to this policy
 
 If FoldTube ever adds a feature that changes any of this, such as syncing across devices, this policy will be updated first, with a new date at the top.
