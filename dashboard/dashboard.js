@@ -196,6 +196,13 @@ async function renderShortcuts(list, { short = false } = {}) {
     return li;
   });
   list.replaceChildren(...items);
+
+  // Keys mentioned in running text (Help's first answer).
+  const keysByCommand = new Map(rows.map(r => [r.name, r]));
+  document.querySelectorAll('[data-shortcut]').forEach(el => {
+    const row = keysByCommand.get(el.dataset.shortcut);
+    el.textContent = row?.isSet ? row.keys : 'no shortcut set';
+  });
 }
 
 // Version in the Settings and Help footers; Firefox-only help where it applies.

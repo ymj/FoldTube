@@ -171,12 +171,7 @@
       </div>
       <div class="modal-body">
         <div class="setting-group">
-          <h3>How it works</h3>
-          <ol class="how-steps">
-            <li><strong>Fold.</strong> Click the FoldTube icon to save your open YouTube videos and close their tabs.</li>
-            <li><strong>Find.</strong> They wait here. Search, sort, or filter them by length.</li>
-            <li><strong>Watch.</strong> Click a video to open it. It leaves the list, since you're watching it now.</li>
-          </ol>
+          <h3>Keyboard shortcuts</h3>
           <div class="help-shortcuts">
             <ul id="help-shortcut-list" class="shortcut-inline" aria-label="Keyboard shortcuts"></ul>
             <button id="btn-help-change-shortcuts" class="btn-secondary btn-small">Change shortcuts</button>
@@ -186,48 +181,57 @@
             <strong>Manage Extension Shortcuts</strong>.
           </p>
         </div>
+
         <div class="setting-group">
-          <h3>Questions</h3>
+          <h3>Frequently asked questions</h3>
           <div class="faq">
             <details name="faq">
-              <summary>Where did my video go?</summary>
-              <p>Opening a video removes it from your list, since you're watching it now. If you opened several selected
-                videos at once, click <strong>Undo</strong> in the message that appears to put them back. To save a single
-                video again, fold its tab.</p>
+              <summary>How does FoldTube work?</summary>
+              <p>FoldTube gets YouTube tabs out of your way without losing them. Click the FoldTube icon, or press
+                <kbd data-shortcut="_execute_action"></kbd>, and every open YouTube video is saved here and its tab is
+                closed. Press <kbd data-shortcut="fold-current-tab"></kbd> to save just the tab you're on, and
+                <kbd data-shortcut="open-dashboard"></kbd> to come back to this list. When you're ready to watch, click
+                a video to open it again.</p>
             </details>
             <details name="faq">
-              <summary>What does auto-collapse save?</summary>
-              <p>With auto-collapse on (Settings &rarr; General), FoldTube saves the YouTube videos in a window when you
-                close it, and all of them when you quit the browser. After a quit, they appear the next time the browser
-                starts. If the browser reopens those tabs, they aren't saved twice. Closing a single tab never saves
-                it.</p>
+              <summary>Why do videos disappear after I open them?</summary>
+              <p>FoldTube is a list of things to watch, so opening a video takes it off the list. That way the list only
+                holds what you haven't watched yet. Opened several at once by mistake? Click <strong>Undo</strong> in the
+                message at the bottom of the page. Want to keep one for later? Save its tab again.</p>
             </details>
             <details name="faq">
-              <summary>Why does a video say &ldquo;Unknown Channel&rdquo; or show no length?</summary>
-              <p>It was saved from a sleeping or closed tab, so FoldTube couldn't read its page. When you're online,
-                FoldTube asks YouTube for the channel name. The length needs a YouTube API key (Settings &rarr; Advanced),
-                and so do the details of videos that can't be embedded on other sites.</p>
+              <summary>Which tabs get saved automatically?</summary>
+              <p>None, unless you turn on <strong>Auto-collapse</strong> in Settings. With it on, FoldTube saves the
+                YouTube videos in any window you close, and all of them when you quit the browser. Those appear here the
+                next time the browser starts. Closing a single tab never saves it, and if your browser reopens your tabs,
+                they aren't saved twice.</p>
             </details>
             <details name="faq">
-              <summary>Why didn't a tab fold?</summary>
-              <p>FoldTube folds YouTube video, Shorts and live pages. Other YouTube pages, such as the home page, search
-                results, channels and playlists, stay open.</p>
+              <summary>Why wasn't a YouTube tab saved?</summary>
+              <p>FoldTube saves videos, Shorts and live streams. Other YouTube pages, like the home page, search results,
+                channels and playlists, are left open.</p>
             </details>
             <details name="faq">
-              <summary>Where is my library stored?</summary>
-              <p>Only in this browser, on this device. It isn't synced, and uninstalling FoldTube deletes it. To keep a
-                copy, use <strong>Export to JSON</strong> in Settings &rarr; Advanced; <strong>Import from JSON</strong>
-                brings it back.</p>
+              <summary>Why is a video's channel or duration missing?</summary>
+              <p>Videos saved from a sleeping or closed tab arrive without their page details. FoldTube looks up the
+                channel the next time you're online. The duration needs a free YouTube API key, and so do the details of
+                videos that can't be shown on other sites. You can add a key in Settings &rarr; Advanced.</p>
             </details>
             <details name="faq">
-              <summary>Does FoldTube send my data anywhere?</summary>
-              <p>There are no FoldTube servers, analytics or tracking. FoldTube talks only to YouTube and Google: it asks
-                YouTube for the channel names of saved videos (by video ID, without cookies), and if you add an API key,
-                it sends video IDs and your key to Google's YouTube Data API.</p>
+              <summary>Where are my saved videos stored (and can I back them up)?</summary>
+              <p>Only in this browser, on this device. They don't sync, and uninstalling FoldTube deletes them. To keep a
+                copy, open Settings &rarr; Advanced and choose <strong>Export to JSON</strong>.
+                <strong>Import from JSON</strong> brings them back, here or on another computer.</p>
+            </details>
+            <details name="faq">
+              <summary>Is my watch history private?</summary>
+              <p>Yes. FoldTube has no servers, accounts, analytics or tracking, and your list never leaves your browser.
+                To fill in channel names, it asks YouTube about a video by its ID, without your cookies or sign-in. If you
+                add an API key, it also asks Google's YouTube API, using your key.</p>
             </details>
             <details name="faq" id="faq-firefox" hidden>
-              <summary>Nothing happens when I fold (Firefox)</summary>
-              <p>Firefox asks before letting extensions read websites. Open <strong>about:addons</strong>, choose
+              <summary>Why does nothing happen when I fold in Firefox?</summary>
+              <p>Firefox asks you before an extension can read a website. Open <strong>about:addons</strong>, choose
                 FoldTube, open <strong>Permissions</strong>, and turn on access to youtube.com.</p>
             </details>
           </div>
