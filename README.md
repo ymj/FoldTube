@@ -132,7 +132,7 @@ npm test        # Run unit tests with Node's built-in test runner
 - Vanilla HTML / CSS / JavaScript — zero runtime dependencies, zero frameworks
 - `chrome.storage.local` for persistence
 - `chrome.scripting` for DOM metadata extraction (with `world: 'MAIN'` for ad-safe duration capture)
-- `chrome.tabs` + `chrome.notifications` for tab management and user feedback
+- `chrome.tabs` events and `chrome.notifications` for tab management and user feedback, with no `tabs` permission: tab URLs and titles are read only on YouTube, through the host permission
 
 ---
 

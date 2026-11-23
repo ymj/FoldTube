@@ -20,6 +20,22 @@ document.addEventListener('DOMContentLoaded', () => {
   init();
 });
 
+// The service worker asks before opening a dashboard, so there is only ever
+// one: this tab brings itself to the front and says so.
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id || request?.action !== 'focusDashboard') return;
+  focusThisTab().then(sendResponse, () => sendResponse(false));
+  return true; // respond asynchronously
+});
+
+async function focusThisTab() {
+  const tab = await chrome.tabs.getCurrent();
+  if (!tab) return false; // not shown in a tab
+  await chrome.tabs.update(tab.id, { active: true });
+  try { await chrome.windows.update(tab.windowId, { focused: true }); } catch {}
+  return true;
+}
+
 // ---- Debounce utility ----
 function debounce(fn, delay) {
   let t;
