@@ -125,6 +125,10 @@ FoldTube doesn't sell or share your data, and doesn't use it for anything other 
 - **Storage:** to keep your list and settings in your browser.
 - **Notifications:** to tell you how many tabs were folded.
 
+### Deleting your data
+
+Uninstalling FoldTube deletes everything it stored.
+
 ### Changes to this policy
 
 If FoldTube ever adds a feature that changes any of this, such as syncing across devices, this policy will be updated first, with a new date at the top.
