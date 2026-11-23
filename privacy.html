@@ -24,7 +24,13 @@
     }
     main { max-width: 720px; margin: 0 auto; padding: 48px 20px 64px; }
     header { display: flex; align-items: center; gap: 12px; margin-bottom: 36px; }
-    header img { width: 36px; height: 36px; }
+    /* The icon is a dark folder on a transparent background: a light tile keeps
+       it visible on the dark theme. */
+    header .logo {
+      display: grid; place-items: center; width: 48px; height: 48px;
+      background: #ffffff; border: 1px solid var(--border); border-radius: 12px;
+    }
+    header .logo img { width: 40px; height: 40px; }
     header span { font-weight: 700; font-size: 1.15rem; }
     h1 { margin: 0 0 6px; font-size: 2rem; line-height: 1.2; letter-spacing: -0.01em; }
     .updated { margin: 0 0 28px; color: var(--muted); font-size: 0.9rem; }
@@ -46,7 +52,7 @@
 <body>
   <main>
     <header>
-      <img src="icon128.png" alt="">
+      <span class="logo"><img src="icon128.png" alt=""></span>
       <span>FoldTube</span>
     </header>
 
@@ -101,7 +107,7 @@
       be updated first, with a new date at the top.</p>
 
     <h2>Contact</h2>
-    <p>Questions about privacy: <a href="mailto:hello@osumapps.com">hello@osumapps.com</a></p>
+    <p>Questions about privacy: <a href="mailto:hello+foldtube@osumapps.com">hello+foldtube@osumapps.com</a></p>
 
     <footer>FoldTube is a browser extension for Chrome, Brave, Edge and Firefox.
       <a href="https://github.com/ymj/FoldTube">Source code on GitHub</a>.</footer>
