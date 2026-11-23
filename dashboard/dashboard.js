@@ -164,7 +164,10 @@ function showUndoToast(message, restoreFn) {
 // ---- Keyboard Shortcuts (Settings) ----
 
 // Fill a list with the shortcuts as currently bound (Settings and Help).
-async function renderShortcuts(list) {
+// Help uses the short labels, to fit on one line.
+const SHORT_LABELS = { '_execute_action': 'Fold all', 'fold-current-tab': 'Fold this tab', 'open-dashboard': 'Dashboard' };
+
+async function renderShortcuts(list, { short = false } = {}) {
   let rows;
   try {
     const [commands, { os }] = await Promise.all([chrome.commands.getAll(), chrome.runtime.getPlatformInfo()]);
@@ -174,11 +177,11 @@ async function renderShortcuts(list) {
     rows = describeShortcuts([], '');
   }
 
-  const items = rows.map(({ label, keys, isSet }) => {
+  const items = rows.map(({ name: command, label, keys, isSet }) => {
     const li = document.createElement('li');
     const name = document.createElement('span');
     name.className = 'shortcut-label';
-    name.textContent = label;
+    name.textContent = short ? SHORT_LABELS[command] || label : label;
     const value = document.createElement('span');
     value.className = 'shortcut-keys';
     if (isSet) {
@@ -264,7 +267,7 @@ function bindControls() {
   };
   document.getElementById('btn-settings').addEventListener('click', openSettings);
   document.getElementById('btn-help').addEventListener('click', () => {
-    renderShortcuts(document.getElementById('help-shortcut-list'));
+    renderShortcuts(document.getElementById('help-shortcut-list'), { short: true });
     helpModal.showModal();
   });
   document.getElementById('btn-close-help').addEventListener('click', () => helpModal.close());

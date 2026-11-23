@@ -552,6 +552,57 @@ body {
   text-align: right;
 }
 
+/* Help: shortcuts on one wrapping line */
+.help-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+
+.shortcut-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.shortcut-inline li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.shortcut-inline kbd {
+  padding: 1px 6px;
+  font-family: var(--font-family);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+}
+
+.shortcut-inline .shortcut-unset {
+  font-style: italic;
+}
+
+.btn-small {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
 /* Help: How it works */
 .how-steps {
   margin: 0;
