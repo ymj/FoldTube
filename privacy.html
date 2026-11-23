@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy · FoldTube</title>
+  <meta name="description" content="How FoldTube, the YouTube tab manager extension, handles your data: your list stays in your browser, with no servers, accounts, ads, analytics, cookies or tracking.">
+  <link rel="icon" href="icon128.png">
+  <style>
+    :root {
+      --bg: #f5f5f5; --surface: #ffffff; --text: #0f0f0f; --muted: #5f5f5f;
+      --border: #dedede; --accent: #e62117; --link: #065fd4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f0f0f; --surface: #1c1c1c; --text: #f1f1f1; --muted: #a8a8a8;
+        --border: #303030; --accent: #ff4e45; --link: #3ea6ff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 48px 20px 64px; }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 36px; }
+    header img { width: 36px; height: 36px; }
+    header span { font-weight: 700; font-size: 1.15rem; }
+    h1 { margin: 0 0 6px; font-size: 2rem; line-height: 1.2; letter-spacing: -0.01em; }
+    .updated { margin: 0 0 28px; color: var(--muted); font-size: 0.9rem; }
+    .summary {
+      margin: 0 0 36px; padding: 18px 20px; background: var(--surface);
+      border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px;
+    }
+    h2 { margin: 36px 0 10px; font-size: 1.2rem; }
+    p { margin: 0 0 12px; }
+    ul { margin: 0 0 12px; padding-left: 22px; }
+    li { margin-bottom: 8px; }
+    a { color: var(--link); }
+    footer {
+      margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border);
+      color: var(--muted); font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="icon128.png" alt="">
+      <span>FoldTube</span>
+    </header>
+
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: November 23, 2026</p>
+
+    <p class="summary">FoldTube is built to keep what you watch private. In short: your list stays in your browser,
+      and FoldTube has no servers, accounts, ads, analytics, cookies or tracking. Nothing is ever sent to the
+      developer.</p>
+
+    <h2>What FoldTube keeps, and where</h2>
+    <p>Everything below is stored in your browser, on your device. It isn't synced, and it isn't sent to the
+      developer.</p>
+    <ul>
+      <li><strong>The videos you save:</strong> the title, channel, length, link and thumbnail of each video, and
+        the date you saved it.</li>
+      <li><strong>Your settings:</strong> theme, auto-collapse, and your YouTube API key if you choose to add
+        one.</li>
+      <li><strong>Your open YouTube video tabs:</strong> FoldTube keeps a short list of the YouTube videos open in
+        your browser, so they can still be saved if the browser quits while auto-collapse is on. A tab drops off
+        the list when you close it or leave YouTube.</li>
+    </ul>
+
+    <h2>What FoldTube sends, and to whom</h2>
+    <p>FoldTube talks only to YouTube and Google, directly from your browser:</p>
+    <ul>
+      <li><strong>YouTube, for channel names.</strong> When a saved video has no channel name (for example, it was
+        saved from a sleeping tab), FoldTube asks YouTube for it using the video's ID. These requests carry no
+        cookies and aren't linked to your YouTube account.</li>
+      <li><strong>Google's YouTube Data API, only if you add a key.</strong> FoldTube then sends video IDs and your
+        key to Google to fill in channel names and lengths. You can remove the key at any time in Settings &rarr;
+        Advanced.</li>
+      <li><strong>YouTube itself, when you open a video.</strong> Opening a video, or YouTube, loads it in a normal
+        browser tab, just as if you had clicked a link. YouTube's own privacy policy applies there.</li>
+    </ul>
+    <p>FoldTube doesn't sell or share your data, and doesn't use it for anything other than the features
+      above.</p>
+
+    <h2>What FoldTube can access</h2>
+    <ul>
+      <li><strong>youtube.com:</strong> to find your open YouTube video tabs, and to read a video's title, channel
+        and length from its page when you fold it. FoldTube can't see other websites.</li>
+      <li><strong>Storage:</strong> to keep your list and settings in your browser.</li>
+      <li><strong>Notifications:</strong> to tell you how many tabs were folded.</li>
+    </ul>
+
+    <h2>Deleting your data</h2>
+    <p>Uninstalling FoldTube deletes everything it stored.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>If FoldTube ever adds a feature that changes any of this, such as syncing across devices, this policy will
+      be updated first, with a new date at the top.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about privacy: <a href="mailto:hello@osumapps.com">hello@osumapps.com</a></p>
+
+    <footer>FoldTube is a browser extension for Chrome, Brave, Edge and Firefox.
+      <a href="https://github.com/ymj/FoldTube">Source code on GitHub</a>.</footer>
+  </main>
+</body>
+</html>
