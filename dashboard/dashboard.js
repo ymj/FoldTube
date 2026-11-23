@@ -243,10 +243,16 @@ function bindSettingsTabs() {
   });
 }
 
-// Side by side when the shortcuts fit, stacked when they don't.
+// Side by side when the shortcuts fit, stacked when they don't. Every key
+// gets the width of the widest one, so they line up either way.
 function fitShortcutsCard(card) {
   if (!card || !card.isConnected) return;
   const list = card.querySelector('.shortcut-keys-list');
+  const keys = [...list.querySelectorAll('kbd')];
+  keys.forEach(k => { k.style.minWidth = ''; });
+  const widest = Math.ceil(Math.max(0, ...keys.map(k => k.getBoundingClientRect().width)));
+  if (widest > 0) keys.forEach(k => { k.style.minWidth = `${widest}px`; });
+
   card.classList.remove('stacked');
   if (list.scrollWidth > list.clientWidth) card.classList.add('stacked');
 }
