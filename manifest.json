@@ -1,17 +1,15 @@
 {
   "manifest_version": 3,
   "name": "FoldTube - YouTube Tab Manager",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Collapse and manage your open YouTube tabs in a single dashboard.",
   "permissions": [
-    "tabs",
     "storage",
     "scripting",
     "notifications"
   ],
   "host_permissions": [
-    "*://*.youtube.com/*",
-    "*://*.googleapis.com/*"
+    "*://*.youtube.com/*"
   ],
   "background": {
     "service_worker": "background/service-worker.js",
@@ -19,11 +17,15 @@
   },
   "action": {
     "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     },
     "default_title": "Collapse YouTube Tabs"
   },
   "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "commands": {

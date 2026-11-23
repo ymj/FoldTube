@@ -18,3 +18,15 @@ test('scraper module exports scrapeYouTubeTab', async () => {
   const { scrapeYouTubeTab } = await import('../content/scraper.js');
   assert.equal(typeof scrapeYouTubeTab, 'function');
 });
+
+test('manifest asks only for the permissions FoldTube needs', () => {
+  assert.deepEqual([...manifest.permissions].sort(), ['notifications', 'scripting', 'storage']);
+  assert.deepEqual(manifest.host_permissions, ['*://*.youtube.com/*']);
+});
+
+test('manifest declares 16, 48 and 128 px icons', async () => {
+  for (const icons of [manifest.icons, manifest.action.default_icon]) {
+    assert.deepEqual(Object.keys(icons).sort((a, b) => a - b), ['16', '48', '128']);
+    for (const path of Object.values(icons)) await readFile(new URL(`../${path}`, import.meta.url));
+  }
+});

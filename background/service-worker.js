@@ -197,17 +197,14 @@ chrome.action.onClicked.addListener(handleCollapse);
 
 // ---- Open Dashboard (no collapse) ----
 
+// Without the "tabs" permission the worker can't find the dashboard tab by
+// its URL, so it asks: an open dashboard brings itself to the front and
+// answers. With no answer, a new one is opened.
 async function handleOpenDashboard() {
   try {
-    const dashboardUrl = chrome.runtime.getURL("dashboard/dashboard.html");
-    const dashboardTabs = await chrome.tabs.query({ url: dashboardUrl });
-    if (dashboardTabs.length > 0) {
-      const existingTab = dashboardTabs[0];
-      await chrome.tabs.update(existingTab.id, { active: true });
-      try { await chrome.windows.update(existingTab.windowId, { focused: true }); } catch (_) {}
-    } else {
-      await chrome.tabs.create({ url: dashboardUrl });
-    }
+    const focused = await chrome.runtime.sendMessage({ action: "focusDashboard" }).catch(() => false);
+    if (focused) return;
+    await chrome.tabs.create({ url: chrome.runtime.getURL("dashboard/dashboard.html") });
   } catch (e) {
     console.error("FoldTube: failed to open dashboard", e);
   }
