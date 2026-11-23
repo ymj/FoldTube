@@ -12,7 +12,9 @@ import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults 
 // place that writes it.
 const mutateSavedVideos = createVideoStore({
   read: async () => (await chrome.storage.local.get("savedVideos")).savedVideos || [],
-  write: (videos) => chrome.storage.local.set({ savedVideos: videos }),
+  // hasSavedBefore tells the dashboard's empty view apart: first run vs
+  // everything watched or removed.
+  write: (videos) => chrome.storage.local.set({ savedVideos: videos, ...(videos.length ? { hasSavedBefore: true } : {}) }),
 });
 
 // ---- Shared helpers ----

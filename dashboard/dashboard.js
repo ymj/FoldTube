@@ -100,6 +100,7 @@ async function init() {
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local") {
+      if (changes.hasSavedBefore) hasSavedBefore = Boolean(changes.hasSavedBefore.newValue);
       if (changes.savedVideos) {
         allVideos = changes.savedVideos.newValue || [];
         const currentIds = new Set(allVideos.map(v => v.videoId));
@@ -165,44 +166,59 @@ function showUndoToast(message, restoreFn) {
 
 // ---- Empty state ----
 
-// Shows how many YouTube tabs a fold would save, with a button to fold them.
-// The count follows tabs opened or closed elsewhere while the library is empty.
-async function refreshFoldableCount() {
+// Two empty views: first run (nothing ever saved) and "all caught up"
+// (everything saved has been watched or removed). When YouTube tabs are
+// open, the main button folds them; otherwise it opens YouTube. The count
+// follows tabs opened or closed elsewhere while the library is empty.
+let hasSavedBefore = false;
+
+async function refreshEmptyState() {
   if (allVideos.length) return;
+  document.getElementById('empty-first-run').classList.toggle('hidden', hasSavedBefore);
+  document.getElementById('empty-caught-up').classList.toggle('hidden', !hasSavedBefore);
+
   let tabs = [];
   try {
     tabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
-  } catch (_) { /* no access to YouTube tabs: show the hint instead */ }
+  } catch (_) { /* no access to YouTube tabs: offer to open YouTube instead */ }
   const count = countFoldableTabs(tabs);
   const plural = count === 1 ? '' : 's';
+
+  document.querySelectorAll('.empty-when-no-tabs').forEach(el => el.classList.toggle('hidden', count > 0));
   document.getElementById('empty-has-tabs').classList.toggle('hidden', count === 0);
-  document.getElementById('empty-no-tabs').classList.toggle('hidden', count > 0);
   document.getElementById('empty-tab-count').textContent = `${count} YouTube tab${plural}`;
-  const button = document.getElementById('btn-fold-open-tabs');
-  if (!button.disabled) button.textContent = `Fold ${count} open tab${plural}`;
+
+  const fold = document.getElementById('btn-fold-open-tabs');
+  fold.classList.toggle('hidden', count === 0);
+  if (!fold.disabled) fold.textContent = `Fold ${count} open tab${plural}`;
+  document.getElementById('btn-open-youtube').classList.toggle('hidden', count > 0);
 }
 
 function bindEmptyState() {
-  const button = document.getElementById('btn-fold-open-tabs');
-  button.addEventListener('click', async () => {
-    button.disabled = true;
-    button.textContent = 'Folding…';
+  const fold = document.getElementById('btn-fold-open-tabs');
+  fold.addEventListener('click', async () => {
+    fold.disabled = true;
+    fold.textContent = 'Folding…';
     try {
       const response = await chrome.runtime.sendMessage({ action: 'foldAllTabs' });
       if (!response?.ok) throw new Error(response?.error || 'FoldTube background did not respond');
     } catch (e) {
       console.error('FoldTube: fold from the empty state failed', e);
     } finally {
-      button.disabled = false;
-      refreshFoldableCount(); // the list itself re-renders from storage
+      fold.disabled = false;
+      refreshEmptyState(); // the list itself re-renders from storage
     }
+  });
+
+  document.getElementById('btn-open-youtube').addEventListener('click', () => {
+    chrome.tabs.create({ url: 'https://www.youtube.com/' });
   });
 
   document.getElementById('btn-empty-help').addEventListener('click', () => {
     document.getElementById('btn-help').click();
   });
 
-  const recount = debounce(refreshFoldableCount, 250);
+  const recount = debounce(refreshEmptyState, 250);
   chrome.tabs.onCreated.addListener(recount);
   chrome.tabs.onRemoved.addListener(recount);
   chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
@@ -545,8 +561,14 @@ function updateSelectionBar() {
 // ---- Load & Render ----
 async function loadVideos() {
   try {
-    const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
+    const { savedVideos = [], hasSavedBefore: savedBefore } = await chrome.storage.local.get(["savedVideos", "hasSavedBefore"]);
     allVideos = savedVideos;
+    hasSavedBefore = Boolean(savedBefore);
+    // Libraries from before this flag existed: having videos now counts.
+    if (allVideos.length && !hasSavedBefore) {
+      hasSavedBefore = true;
+      chrome.storage.local.set({ hasSavedBefore: true });
+    }
     processAndRender();
   } catch (err) {
     console.error("Failed to load videos:", err);
@@ -609,10 +631,13 @@ function processAndRender() {
       // gets a plain "No matches".
       const libraryEmpty = allVideos.length === 0;
       emptyState.classList.toggle('hidden', !libraryEmpty);
+      // Nothing to search, sort or filter in an empty library.
+      document.getElementById('controls-bar').classList.toggle('hidden', libraryEmpty);
+      videoCount.classList.toggle('hidden', libraryEmpty);
       noResults.classList.toggle('hidden', libraryEmpty);
       if (libraryEmpty) {
         videoCount.textContent = '0 items';
-        refreshFoldableCount();
+        refreshEmptyState();
       } else {
         videoCount.textContent = `Showing 0 of ${allVideos.length} items`;
       }
@@ -620,6 +645,8 @@ function processAndRender() {
     }
     emptyState.classList.add('hidden');
     noResults.classList.add('hidden');
+    document.getElementById('controls-bar').classList.remove('hidden');
+    videoCount.classList.remove('hidden');
     videoCount.textContent = allVideos.length !== videos.length
       ? `Showing ${videos.length} of ${allVideos.length} items`
       : `${videos.length} item${videos.length === 1 ? '' : 's'}`;
