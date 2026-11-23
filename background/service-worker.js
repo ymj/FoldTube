@@ -1,5 +1,6 @@
 /* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
+import { showSavedMark } from '../content/saved-mark.js';
 import { parseVideoUrl, parseIsoDuration, formatDuration, YOUTUBE_TAB_PATTERNS } from '../lib/youtube.js';
 import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
@@ -268,20 +269,51 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === MENU_FOLD_TAB && tab?.id !== undefined && parseVideoUrl(tab.url)) {
     foldOneTab(tab);
   } else if (info.menuItemId === MENU_SAVE_LINK) {
-    saveLink(info.linkUrl);
+    saveLink(info, tab);
   }
 });
 
 // Save a linked video without opening it. Its title and channel are filled
 // in afterwards.
-async function saveLink(linkUrl) {
-  const video = linkToVideo(linkUrl);
+async function saveLink(info, tab) {
+  const video = linkToVideo(info.linkUrl);
   if (!video) return;
   const { added } = await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
-  notify("foldtube-save-link", added ? "Saved to FoldTube" : "Already in FoldTube");
-  if (added) flashBadge("+1", "#1e8e3e");
-  else flashBadge("✓", "#5f6368");
   if (added) fillInMetadata();
+
+  // Confirm on the page itself, where the user is looking. Pages the
+  // extension can't draw on (browser pages, the extension stores) get the
+  // toolbar badge and a notification instead.
+  if (await showMarkOnPage(info, tab, Boolean(added))) return;
+  flashBadge(added ? "+1" : "✓", added ? "#1e8e3e" : "#5f6368");
+  notify("foldtube-save-link", added ? "Saved to FoldTube" : "Already in FoldTube");
+}
+
+let iconDataUrl = null;
+async function markIcon() {
+  if (iconDataUrl) return iconDataUrl;
+  try {
+    const bytes = new Uint8Array(await (await fetch(chrome.runtime.getURL("icons/icon48.png"))).arrayBuffer());
+    let binary = "";
+    for (const b of bytes) binary += String.fromCharCode(b);
+    iconDataUrl = `data:image/png;base64,${btoa(binary)}`;
+  } catch (_) { /* the pill works without the icon */ }
+  return iconDataUrl;
+}
+
+// Uses activeTab, which the menu click grants for this tab only.
+async function showMarkOnPage(info, tab, added) {
+  if (tab?.id === undefined || tab.id < 0) return false;
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, frameIds: [info.frameId ?? 0] },
+      func: showSavedMark,
+      args: [info.linkUrl, { added, iconUrl: await markIcon() }],
+    });
+    return result?.result === true;
+  } catch (_) {
+    return false;
+  }
 }
 
 // ---- Filling in metadata ----
