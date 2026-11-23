@@ -20,8 +20,11 @@ const mutateSavedVideos = createVideoStore({
 
 // ---- Shared helpers ----
 
-function notify(id, message) {
+// A notification still in the notification centre with the same ID would be
+// updated silently (no banner), so clear it first.
+async function notify(id, message) {
   try {
+    await chrome.notifications.clear(id).catch(() => {});
     chrome.notifications.create(id, {
       type: "basic",
       iconUrl: chrome.runtime.getURL("icons/icon128.png"),
@@ -29,6 +32,18 @@ function notify(id, message) {
       message,
     });
   } catch (_) { /* notifications are non-critical */ }
+}
+
+// A short badge on the toolbar icon: confirmation that shows even when the
+// OS hides notifications.
+let badgeTimer = null;
+function flashBadge(text, color) {
+  try {
+    clearTimeout(badgeTimer);
+    chrome.action.setBadgeBackgroundColor({ color });
+    chrome.action.setBadgeText({ text });
+    badgeTimer = setTimeout(() => chrome.action.setBadgeText({ text: "" }), 3000);
+  } catch (_) { /* the badge is non-critical */ }
 }
 
 // ---- Open YouTube tabs (write-ahead) ----
@@ -264,6 +279,8 @@ async function saveLink(linkUrl) {
   if (!video) return;
   const { added } = await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
   notify("foldtube-save-link", added ? "Saved to FoldTube" : "Already in FoldTube");
+  if (added) flashBadge("+1", "#1e8e3e");
+  else flashBadge("✓", "#5f6368");
   if (added) fillInMetadata();
 }
 
