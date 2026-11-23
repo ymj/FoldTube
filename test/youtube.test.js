@@ -209,3 +209,27 @@ describe('validateImport', () => {
     assert.throws(() => validateImport([{}, { videoId: 'a' }]), /No valid entries/);
   });
 });
+
+describe('countFoldableTabs', async () => {
+  const { countFoldableTabs, YOUTUBE_TAB_PATTERNS } = await import('../lib/youtube.js');
+
+  test('counts the tabs a fold would close: those with a video ID', () => {
+    const tabs = [
+      { url: 'https://www.youtube.com/watch?v=abc' },
+      { url: 'https://www.youtube.com/shorts/def' },
+      { url: 'https://www.youtube.com/live/ghi' },
+      { url: 'https://www.youtube.com/watch' }, // matched by the pattern, but no video ID
+      {}, // URL hidden from the extension
+    ];
+    assert.equal(countFoldableTabs(tabs), 3);
+  });
+
+  test('nothing open, or nothing readable → 0', () => {
+    assert.equal(countFoldableTabs([]), 0);
+    assert.equal(countFoldableTabs(undefined), 0);
+  });
+
+  test('tab patterns cover videos, Shorts and live streams', () => {
+    assert.deepEqual(YOUTUBE_TAB_PATTERNS.map(p => p.split('youtube.com/')[1]), ['watch?v=*', 'shorts/*', 'live/*']);
+  });
+});

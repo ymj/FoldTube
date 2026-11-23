@@ -1,6 +1,6 @@
 /* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
-import { parseVideoUrl, parseIsoDuration, formatDuration } from '../lib/youtube.js';
+import { parseVideoUrl, parseIsoDuration, formatDuration, YOUTUBE_TAB_PATTERNS } from '../lib/youtube.js';
 import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
 import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults } from '../lib/oembed.js';
@@ -16,13 +16,6 @@ const mutateSavedVideos = createVideoStore({
 });
 
 // ---- Shared helpers ----
-
-// Tab URL patterns for YouTube videos, Shorts and live streams.
-const YOUTUBE_TAB_PATTERNS = [
-  "*://*.youtube.com/watch?v=*",
-  "*://*.youtube.com/shorts/*",
-  "*://*.youtube.com/live/*",
-];
 
 function notify(id, message) {
   try {
@@ -359,6 +352,16 @@ const DASHBOARD_OPS = new Set(['add', 'remove', 'restore']);
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Only this extension's own pages may change the library.
   if (sender.id !== chrome.runtime.id) return;
+
+  // The dashboard's "Fold N open tabs" button: same fold as the toolbar icon,
+  // without re-opening the dashboard it was clicked in.
+  if (request.action === "foldAllTabs") {
+    chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS })
+      .then(processAndSaveTabs)
+      .then(result => sendResponse({ ok: true, result }))
+      .catch(e => sendResponse({ ok: false, error: String(e?.message || e) }));
+    return true; // respond asynchronously
+  }
 
   if (request.action === "runEnrichment") {
     fillInMetadata();

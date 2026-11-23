@@ -1,4 +1,4 @@
-import { validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor } from '../lib/youtube.js';
+import { validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor, YOUTUBE_TAB_PATTERNS, countFoldableTabs } from '../lib/youtube.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 
 let allVideos = [];
@@ -84,6 +84,8 @@ async function saveSettings() {
 async function init() {
   await loadSettings();
   bindControls();
+  bindEmptyState();
+  readShortcutRows().then(fillShortcutRefs);
   showSkeletons();
   await loadVideos();
 
@@ -161,21 +163,84 @@ function showUndoToast(message, restoreFn) {
   }, 5000);
 }
 
+// ---- Empty state ----
+
+// Shows how many YouTube tabs a fold would save, with a button to fold them.
+// The count follows tabs opened or closed elsewhere while the library is empty.
+async function refreshFoldableCount() {
+  if (allVideos.length) return;
+  let tabs = [];
+  try {
+    tabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
+  } catch (_) { /* no access to YouTube tabs: show the hint instead */ }
+  const count = countFoldableTabs(tabs);
+  const plural = count === 1 ? '' : 's';
+  document.getElementById('empty-has-tabs').classList.toggle('hidden', count === 0);
+  document.getElementById('empty-no-tabs').classList.toggle('hidden', count > 0);
+  document.getElementById('empty-tab-count').textContent = `${count} YouTube tab${plural}`;
+  const button = document.getElementById('btn-fold-open-tabs');
+  if (!button.disabled) button.textContent = `Fold ${count} open tab${plural}`;
+}
+
+function bindEmptyState() {
+  const button = document.getElementById('btn-fold-open-tabs');
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    button.textContent = 'Folding…';
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'foldAllTabs' });
+      if (!response?.ok) throw new Error(response?.error || 'FoldTube background did not respond');
+    } catch (e) {
+      console.error('FoldTube: fold from the empty state failed', e);
+    } finally {
+      button.disabled = false;
+      refreshFoldableCount(); // the list itself re-renders from storage
+    }
+  });
+
+  document.getElementById('btn-empty-help').addEventListener('click', () => {
+    document.getElementById('btn-help').click();
+  });
+
+  const recount = debounce(refreshFoldableCount, 250);
+  chrome.tabs.onCreated.addListener(recount);
+  chrome.tabs.onRemoved.addListener(recount);
+  chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+    if (changeInfo.url || changeInfo.status === 'complete') recount();
+  });
+}
+
 // ---- Keyboard Shortcuts (Settings) ----
 
 // Fill a list with the shortcuts as currently bound (Settings and Help).
 // Short labels, so the three fit side by side.
 const SHORT_LABELS = { '_execute_action': 'Fold all tabs', 'fold-current-tab': 'Fold this tab', 'open-dashboard': 'Dashboard' };
 
-async function renderShortcuts(list) {
-  let rows;
+async function readShortcutRows() {
   try {
     const [commands, { os }] = await Promise.all([chrome.commands.getAll(), chrome.runtime.getPlatformInfo()]);
-    rows = describeShortcuts(commands, os);
+    return describeShortcuts(commands, os);
   } catch (e) {
     console.error('FoldTube: could not read shortcuts', e);
-    rows = describeShortcuts([], '');
+    return describeShortcuts([], '');
   }
+}
+
+// Keys mentioned in running text (Help's first answer, the empty state).
+// A [data-shortcut-wrap] phrase is hidden when its shortcut isn't set.
+function fillShortcutRefs(rows) {
+  const byCommand = new Map(rows.map(r => [r.name, r]));
+  document.querySelectorAll('[data-shortcut]').forEach(el => {
+    const row = byCommand.get(el.dataset.shortcut);
+    el.textContent = row?.isSet ? row.keys : 'no shortcut set';
+  });
+  document.querySelectorAll('[data-shortcut-wrap]').forEach(el => {
+    el.hidden = !byCommand.get(el.dataset.shortcutWrap)?.isSet;
+  });
+}
+
+async function renderShortcuts(list) {
+  const rows = await readShortcutRows();
 
   const items = rows.map(({ name: command, label, keys, isSet }) => {
     const li = document.createElement('li');
@@ -197,13 +262,7 @@ async function renderShortcuts(list) {
   });
   list.replaceChildren(...items);
   fitShortcutsCard(list.closest('.shortcuts-card'));
-
-  // Keys mentioned in running text (Help's first answer).
-  const keysByCommand = new Map(rows.map(r => [r.name, r]));
-  document.querySelectorAll('[data-shortcut]').forEach(el => {
-    const row = keysByCommand.get(el.dataset.shortcut);
-    el.textContent = row?.isSet ? row.keys : 'no shortcut set';
-  });
+  fillShortcutRefs(rows);
 }
 
 // Version in the Settings and Help footers; Firefox-only help where it applies.
@@ -537,32 +596,30 @@ function processAndRender() {
     const videosSection = document.getElementById('videos-section');
     const shortsSection = document.getElementById('shorts-section');
     const emptyState = document.getElementById('empty-state');
+    const noResults = document.getElementById('no-results');
     const videoCount = document.querySelector('.video-count');
 
     if (videos.length === 0) {
-      videoGrid.innerHTML = '';
-      shortsGrid.innerHTML = '';
+      videoGrid.replaceChildren();
+      shortsGrid.replaceChildren();
       videosSection.classList.add('hidden');
       shortsSection.classList.add('hidden');
-      emptyState.classList.remove('hidden');
 
-      if (allVideos.length > 0) {
-        emptyState.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <h2>No results</h2>
-          <p>Try adjusting your search or filters</p>`;
-        videoCount.textContent = `Showing 0 of ${allVideos.length} items`;
-      } else {
-        emptyState.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"/></svg>
-          <h2>Your library is empty</h2>
-          <p>Press the FoldTube icon (or Ctrl+Shift+Y) to fold your open YouTube tabs</p>`;
+      // An empty library gets the welcome; a search or filter with no hits
+      // gets a plain "No matches".
+      const libraryEmpty = allVideos.length === 0;
+      emptyState.classList.toggle('hidden', !libraryEmpty);
+      noResults.classList.toggle('hidden', libraryEmpty);
+      if (libraryEmpty) {
         videoCount.textContent = '0 items';
+        refreshFoldableCount();
+      } else {
+        videoCount.textContent = `Showing 0 of ${allVideos.length} items`;
       }
       return;
     }
-
     emptyState.classList.add('hidden');
+    noResults.classList.add('hidden');
     videoCount.textContent = allVideos.length !== videos.length
       ? `Showing ${videos.length} of ${allVideos.length} items`
       : `${videos.length} item${videos.length === 1 ? '' : 's'}`;
