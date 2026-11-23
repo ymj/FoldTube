@@ -157,6 +157,9 @@
         </div>
 
       </div>
+      <footer class="modal-footer">
+        <span><strong>FoldTube</strong> <span class="app-version"></span></span>
+      </footer>
     </div>
   </dialog>
 
@@ -167,6 +170,15 @@
         <button id="btn-close-help" class="close-btn" aria-label="Close Help">&times;</button>
       </div>
       <div class="modal-body">
+        <div class="setting-group">
+          <h3>How it works</h3>
+          <ol class="how-steps">
+            <li><strong>Fold.</strong> Click the FoldTube icon, or use the shortcut below, to save your open YouTube
+              videos and close their tabs.</li>
+            <li><strong>Find.</strong> They wait here. Search, sort, or filter them by length.</li>
+            <li><strong>Watch.</strong> Click a video to open it. It leaves the list, since you're watching it now.</li>
+          </ol>
+        </div>
         <div class="setting-group">
           <h3>Keyboard shortcuts</h3>
           <ul id="help-shortcut-list" class="shortcut-list" aria-label="Keyboard shortcuts"></ul>
@@ -188,7 +200,57 @@
             <li><span class="shortcut-label">Undo a removal</span><span class="shortcut-keys">Click <strong>Undo</strong> in the message</span></li>
           </ul>
         </div>
+        <div class="setting-group">
+          <h3>Questions</h3>
+          <div class="faq">
+            <details name="faq">
+              <summary>Where did my video go?</summary>
+              <p>Opening a video removes it from your list, since you're watching it now. If you opened several selected
+                videos at once, click <strong>Undo</strong> in the message that appears to put them back. To save a single
+                video again, fold its tab.</p>
+            </details>
+            <details name="faq">
+              <summary>What does auto-collapse save?</summary>
+              <p>With auto-collapse on (Settings &rarr; General), FoldTube saves the YouTube videos in a window when you
+                close it, and all of them when you quit the browser. After a quit, they appear the next time the browser
+                starts. If the browser reopens those tabs, they aren't saved twice. Closing a single tab never saves
+                it.</p>
+            </details>
+            <details name="faq">
+              <summary>Why does a video say &ldquo;Unknown Channel&rdquo; or show no length?</summary>
+              <p>It was saved from a sleeping or closed tab, so FoldTube couldn't read its page. When you're online,
+                FoldTube asks YouTube for the channel name. The length needs a YouTube API key (Settings &rarr; Advanced),
+                and so do the details of videos that can't be embedded on other sites.</p>
+            </details>
+            <details name="faq">
+              <summary>Why didn't a tab fold?</summary>
+              <p>FoldTube folds YouTube video, Shorts and live pages. Other YouTube pages, such as the home page, search
+                results, channels and playlists, stay open.</p>
+            </details>
+            <details name="faq">
+              <summary>Where is my library stored?</summary>
+              <p>Only in this browser, on this device. It isn't synced, and uninstalling FoldTube deletes it. To keep a
+                copy, use <strong>Export to JSON</strong> in Settings &rarr; Advanced; <strong>Import from JSON</strong>
+                brings it back.</p>
+            </details>
+            <details name="faq">
+              <summary>Does FoldTube send my data anywhere?</summary>
+              <p>There are no FoldTube servers, analytics or tracking. FoldTube talks only to YouTube and Google: it asks
+                YouTube for the channel names of saved videos (by video ID, without cookies), and if you add an API key,
+                it sends video IDs and your key to Google's YouTube Data API.</p>
+            </details>
+            <details name="faq" id="faq-firefox" hidden>
+              <summary>Nothing happens when I fold (Firefox)</summary>
+              <p>Firefox asks before letting extensions read websites. Open <strong>about:addons</strong>, choose
+                FoldTube, open <strong>Permissions</strong>, and turn on access to youtube.com.</p>
+            </details>
+          </div>
+        </div>
       </div>
+      <footer class="modal-footer">
+        <span><strong>FoldTube</strong> <span class="app-version"></span></span>
+        <span class="app-description"></span>
+      </footer>
     </div>
   </dialog>
 

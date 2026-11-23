@@ -195,6 +195,17 @@ async function renderShortcuts(list) {
   list.replaceChildren(...items);
 }
 
+// Version in the Settings and Help footers; Firefox-only help where it applies.
+function fillAboutInfo() {
+  const { version, description } = chrome.runtime.getManifest();
+  document.querySelectorAll('.app-version').forEach(el => { el.textContent = version; });
+  document.querySelectorAll('.app-description').forEach(el => { el.textContent = description; });
+  // getBrowserInfo exists only in Firefox.
+  if (typeof chrome.runtime.getBrowserInfo === 'function') {
+    document.getElementById('faq-firefox').hidden = false;
+  }
+}
+
 // Settings tabs: General (everyday) and Advanced (API key, backup).
 const SETTINGS_TABS = ['general', 'advanced'];
 
@@ -260,6 +271,7 @@ function bindControls() {
   document.getElementById('btn-help-change-shortcuts')
     .addEventListener('click', () => openShortcutSettings(document.getElementById('help-shortcut-hint')));
   bindSettingsTabs();
+  fillAboutInfo();
   document.getElementById('btn-change-shortcuts')
     .addEventListener('click', () => openShortcutSettings(document.getElementById('shortcut-hint')));
   document.getElementById('btn-close-settings').addEventListener('click', () => settingsModal.close());
