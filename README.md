@@ -135,7 +135,7 @@ If FoldTube ever adds a feature that changes any of this, such as syncing across
 
 ### Contact
 
-Questions about privacy: [hello@osumapps.com](mailto:hello@osumapps.com)
+Questions about privacy: [hello+foldtube@osumapps.com](mailto:hello+foldtube@osumapps.com)
 
 ---
 
