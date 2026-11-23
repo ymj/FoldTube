@@ -1,8 +1,8 @@
 /* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
-import { urlToVideoData, parseVideoUrl, parseIsoDuration, formatDuration } from '../lib/youtube.js';
-import { foldTabs } from '../lib/fold.js';
-import { createVideoStore, applyVideoOp, patchVideos } from '../lib/store.js';
+import { parseVideoUrl, parseIsoDuration, formatDuration } from '../lib/youtube.js';
+import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
+import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
 
 // ---- Saved videos: single owner ----
 
@@ -34,52 +34,84 @@ function notify(id, message) {
   } catch (_) { /* notifications are non-critical */ }
 }
 
-// ---- State & Storage Setup ----
+// ---- Open YouTube tabs (write-ahead) ----
 
-async function updateActiveTabsCache() {
-  const tabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
-  const map = {};
-  for(const t of tabs) map[t.id] = { url: t.url, title: t.title };
-  
-  if (chrome.storage && chrome.storage.session) {
-    await chrome.storage.session.set({ activeYoutubeTabs: map });
-  }
+// The YouTube video tabs that are open, kept in storage.local so the list
+// survives a quit or crash (see lib/fold.js). Changes are applied one at a
+// time. During a session it is updated tab by tab and never rebuilt, so a tab
+// whose close event wakes the worker is still listed when the event is handled.
+const TAB_SNAPSHOT_KEY = "openYoutubeTabs";
+const enqueueSnapshot = createSerialQueue();
+
+async function readTabSnapshot() {
+  return (await chrome.storage.local.get(TAB_SNAPSHOT_KEY))[TAB_SNAPSHOT_KEY] || {};
 }
 
-// Initial hydration
-updateActiveTabsCache();
+function writeTabSnapshot(snapshot) {
+  return chrome.storage.local.set({ [TAB_SNAPSHOT_KEY]: snapshot });
+}
 
-// Keep tracker updated
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.url || changeInfo.title || changeInfo.status === "complete") {
-    if (tab.url && tab.url.includes('youtube.com/')) {
-      updateActiveTabsCache();
-    }
+function videoIdsOfTabs(tabs) {
+  return new Set(tabs.map(t => parseVideoUrl(t.url)?.videoId).filter(Boolean));
+}
+
+// storage.session is cleared when the browser starts and when the extension
+// is installed, updated or reloaded: that marks a new session.
+const SESSION_FLAG = "foldtubeSessionStarted";
+
+// A new session: save what the last one left open and didn't get back, drop
+// duplicates of restored tabs, then list the tabs open now.
+const sessionReady = enqueueSnapshot(async () => {
+  if ((await chrome.storage.session.get(SESSION_FLAG))[SESSION_FLAG]) return;
+
+  const tabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
+  const openIds = videoIdsOfTabs(tabs);
+  const { settings = {} } = await chrome.storage.local.get("settings");
+
+  const recovered = recoverClosedTabs(await readTabSnapshot(), openIds, settings);
+  if (recovered.length) {
+    const { added } = await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: recovered }));
+    console.log(`FoldTube: saved ${added} tab(s) left open when the browser last closed.`);
   }
+
+  // A video saved on window close whose tab the browser restored is a
+  // duplicate; the rest are kept and marked checked (see lib/store.js).
+  const { removed } = await mutateSavedVideos(videos => reconcileRestoredTabs(videos, openIds));
+  if (removed.length) console.log(`FoldTube: removed ${removed.length} restored tab(s) already open.`);
+
+  await writeTabSnapshot(buildTabSnapshot(tabs));
+  await chrome.storage.session.set({ [SESSION_FLAG]: true });
+}).catch(e => console.error("FoldTube: session start failed", e));
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!changeInfo.url && !changeInfo.title && changeInfo.status !== "complete") return;
+  enqueueSnapshot(async () => {
+    const snapshot = await readTabSnapshot();
+    const next = updateTabSnapshot(snapshot, tabId, tab);
+    if (next !== snapshot) await writeTabSnapshot(next);
+  });
 });
 
 // ---- Auto-collapse when a window closes ----
 
-chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
-  if (removeInfo.isWindowClosing) {
-    const { settings = {} } = await chrome.storage.local.get("settings");
-    if (!settings.autoCollapse) return;
+// While the browser keeps running (closing one window), save the window's
+// tabs right away. If the browser quits first, the list above still has them.
+chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  enqueueSnapshot(async () => {
+    const snapshot = await readTabSnapshot();
+    const entry = snapshot[tabId];
+    if (!entry) return;
 
-    if (chrome.storage && chrome.storage.session) {
-      const { activeYoutubeTabs = {} } = await chrome.storage.session.get("activeYoutubeTabs");
-      const tabData = activeYoutubeTabs[tabId];
-      
-      if (tabData) {
-        const videoObj = urlToVideoData(tabData.url, tabData.title);
-        if (videoObj) {
-          await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [videoObj] }));
-        }
-      }
+    if (removeInfo.isWindowClosing) {
+      const { settings = {} } = await chrome.storage.local.get("settings");
+      const video = autoCollapseVideo(removeInfo, settings, entry);
+      if (video) await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
     }
-  } else {
-    // Standard tab close, just update cache
-    updateActiveTabsCache();
-  }
+
+    // Saved, or closed on purpose: no longer a candidate.
+    const { [tabId]: _closed, ...rest } = snapshot;
+    await writeTabSnapshot(rest);
+  });
 });
 
 // ---- Manual Collapse (Clicking Extension Icon) ----
@@ -201,33 +233,12 @@ async function handleFoldCurrentTab() {
   }
 }
 
-// ---- Startup Reconciliation & Enrichment ----
+// ---- Startup enrichment ----
 
 chrome.runtime.onStartup.addListener(async () => {
-  await reconcileTabs();
+  await sessionReady;
   await runEnrichment();
-  await updateActiveTabsCache();
 });
-
-async function reconcileTabs() {
-  const physicalTabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
-  if (physicalTabs.length === 0) return;
-
-  // Extract video IDs from restored tabs for robust matching regardless of
-  // extra query params (timestamps, playlist refs, etc.) that may differ.
-  const physicalVideoIds = new Set(
-    physicalTabs.map(t => parseVideoUrl(t.url)?.videoId).filter(Boolean)
-  );
-
-  // An auto-collapsed video whose tab the browser restored is a duplicate.
-  const { removed } = await mutateSavedVideos(videos => applyVideoOp(videos, {
-    type: 'remove',
-    videoIds: videos
-      .filter(v => v.metadataSource === "auto-collapsed" && physicalVideoIds.has(v.videoId))
-      .map(v => v.videoId),
-  }));
-  if (removed.length) console.log(`Reconciled ${removed.length} restored tab(s) already open.`);
-}
 
 async function runEnrichment() {
   const { settings = {} } = await chrome.storage.local.get("settings");
