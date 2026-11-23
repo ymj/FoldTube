@@ -28,10 +28,10 @@ FoldTube is a powerful YouTube tab manager that helps you take back control of y
 ## Installation
 
 ### Chrome / Brave / Edge
-**Chrome Web Store:** `https://chromewebstore.google.com/detail/phkhokoagdgofaaofmecfaibcnnahhoh?utm_source=item-share-cb`
+**Chrome Web Store:** [FoldTube - YouTube Tab Manager](https://chromewebstore.google.com/detail/phkhokoagdgofaaofmecfaibcnnahhoh)
 
 ### Firefox
-**Mozilla Add-ons (AMO):** *Coming soon*
+**Firefox Add-ons:** [FoldTube - YouTube Tab Manager](https://addons.mozilla.org/firefox/addon/foldtube-youtube-tab-manager/)
 
 ### Manual / Developer Install
 
