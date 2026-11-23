@@ -552,9 +552,11 @@ body {
   text-align: right;
 }
 
-/* Help: shortcuts card. One column per shortcut (label above the key),
-   thin dividers between them, the change button on the right. */
-.help-shortcuts {
+/* Shortcuts card (Settings and Help). One column per shortcut, label above
+   the key, dividers between, the change button on the right. When the
+   columns don't fit (narrow window, long key names), the script adds
+   .stacked: the shortcuts become rows and the button moves below. */
+.shortcuts-card {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -564,18 +566,16 @@ body {
   border-radius: var(--border-radius);
 }
 
-.shortcut-inline {
+.shortcut-keys-list {
   display: flex;
-  flex-wrap: wrap;
   flex: 1;
   min-width: 0;
-  row-gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.shortcut-inline li {
+.shortcut-keys-list li {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -584,14 +584,15 @@ body {
   border-left: 1px solid var(--border-color);
   font-size: 0.85rem;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
-.shortcut-inline li:first-child {
+.shortcut-keys-list li:first-child {
   padding-left: 0;
   border-left: none;
 }
 
-.shortcut-inline kbd {
+.shortcut-keys-list kbd {
   padding: 4px 10px;
   font-family: var(--font-family);
   font-size: 0.95rem;
@@ -602,13 +603,41 @@ body {
   border-radius: 6px;
 }
 
-.shortcut-inline .shortcut-unset {
+.shortcut-keys-list .shortcut-unset {
   font-style: italic;
   padding: 5px 0;
 }
 
-.help-shortcuts .btn-small {
+.shortcuts-card .btn-small {
   flex-shrink: 0;
+}
+
+.shortcuts-card.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.shortcuts-card.stacked .shortcut-keys-list {
+  flex-direction: column;
+}
+
+.shortcuts-card.stacked .shortcut-keys-list li {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-left: none;
+  border-top: 1px solid var(--border-color);
+}
+
+.shortcuts-card.stacked .shortcut-keys-list li:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.shortcuts-card.stacked .btn-small {
+  align-self: flex-start;
 }
 
 .btn-small {
@@ -770,50 +799,6 @@ body {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-/* Keyboard Shortcuts */
-.shortcut-list {
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
-}
-
-.shortcut-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 6px 0;
-  font-size: 0.9rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.shortcut-list li:last-child {
-  border-bottom: none;
-}
-
-.shortcut-keys {
-  color: var(--text-secondary);
-  text-align: right;
-}
-
-.shortcut-list kbd {
-  display: inline-block;
-  min-width: 1.4em;
-  padding: 2px 8px;
-  font-family: var(--font-family);
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  text-align: center;
-  background: var(--bg-color);
-  border: 1px solid var(--border-color);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-}
-
-.shortcut-list .shortcut-unset {
-  font-style: italic;
 }
 
 .shortcut-hint {

@@ -164,10 +164,10 @@ function showUndoToast(message, restoreFn) {
 // ---- Keyboard Shortcuts (Settings) ----
 
 // Fill a list with the shortcuts as currently bound (Settings and Help).
-// Help uses the short labels, to fit on one line.
+// Short labels, so the three fit side by side.
 const SHORT_LABELS = { '_execute_action': 'Fold all', 'fold-current-tab': 'Fold this tab', 'open-dashboard': 'Dashboard' };
 
-async function renderShortcuts(list, { short = false } = {}) {
+async function renderShortcuts(list) {
   let rows;
   try {
     const [commands, { os }] = await Promise.all([chrome.commands.getAll(), chrome.runtime.getPlatformInfo()]);
@@ -181,7 +181,7 @@ async function renderShortcuts(list, { short = false } = {}) {
     const li = document.createElement('li');
     const name = document.createElement('span');
     name.className = 'shortcut-label';
-    name.textContent = short ? SHORT_LABELS[command] || label : label;
+    name.textContent = SHORT_LABELS[command] || label;
     const value = document.createElement('span');
     value.className = 'shortcut-keys';
     if (isSet) {
@@ -196,6 +196,7 @@ async function renderShortcuts(list, { short = false } = {}) {
     return li;
   });
   list.replaceChildren(...items);
+  fitShortcutsCard(list.closest('.shortcuts-card'));
 
   // Keys mentioned in running text (Help's first answer).
   const keysByCommand = new Map(rows.map(r => [r.name, r]));
@@ -242,6 +243,26 @@ function bindSettingsTabs() {
   });
 }
 
+// Side by side when the shortcuts fit, stacked when they don't.
+function fitShortcutsCard(card) {
+  if (!card || !card.isConnected) return;
+  const list = card.querySelector('.shortcut-keys-list');
+  card.classList.remove('stacked');
+  if (list.scrollWidth > list.clientWidth) card.classList.add('stacked');
+}
+
+// Re-check when the card's width changes (window resized, dialog opened).
+// Height changes from stacking itself are ignored, so this can't loop.
+const shortcutsCardObserver = new ResizeObserver(entries => {
+  for (const { target, contentRect } of entries) {
+    const width = String(Math.round(contentRect.width));
+    if (target.dataset.width === width) continue;
+    target.dataset.width = width;
+    fitShortcutsCard(target);
+  }
+});
+document.querySelectorAll('.shortcuts-card').forEach(card => shortcutsCardObserver.observe(card));
+
 // Chrome, Brave and Edge have a shortcuts page; Firefox opens its own.
 // If neither works, show the written steps in `hint`.
 async function openShortcutSettings(hint) {
@@ -274,7 +295,7 @@ function bindControls() {
   };
   document.getElementById('btn-settings').addEventListener('click', openSettings);
   document.getElementById('btn-help').addEventListener('click', () => {
-    renderShortcuts(document.getElementById('help-shortcut-list'), { short: true });
+    renderShortcuts(document.getElementById('help-shortcut-list'));
     helpModal.showModal();
   });
   document.getElementById('btn-close-help').addEventListener('click', () => helpModal.close());

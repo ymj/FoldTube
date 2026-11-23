@@ -118,9 +118,11 @@
 
           <div class="setting-group">
             <h3>Keyboard Shortcuts</h3>
-            <ul id="shortcut-list" class="shortcut-list" aria-label="Keyboard shortcuts"></ul>
-            <div class="setting-actions">
-              <button id="btn-change-shortcuts" class="btn-secondary">Change shortcuts</button>
+            <div class="shortcuts">
+              <div class="shortcuts-card">
+                <ul id="shortcut-list" class="shortcut-keys-list" aria-label="Keyboard shortcuts"></ul>
+                <button id="btn-change-shortcuts" class="btn-secondary btn-small">Change shortcuts</button>
+              </div>
             </div>
             <p id="shortcut-hint" class="shortcut-hint hidden">
               To change them, open <strong>about:addons</strong>, click the gear icon, then
@@ -172,9 +174,11 @@
       <div class="modal-body">
         <div class="setting-group">
           <h3>Keyboard shortcuts</h3>
-          <div class="help-shortcuts">
-            <ul id="help-shortcut-list" class="shortcut-inline" aria-label="Keyboard shortcuts"></ul>
-            <button id="btn-help-change-shortcuts" class="btn-secondary btn-small">Change shortcuts</button>
+          <div class="shortcuts">
+            <div class="shortcuts-card">
+              <ul id="help-shortcut-list" class="shortcut-keys-list" aria-label="Keyboard shortcuts"></ul>
+              <button id="btn-help-change-shortcuts" class="btn-secondary btn-small">Change shortcuts</button>
+            </div>
           </div>
           <p id="help-shortcut-hint" class="shortcut-hint hidden">
             To change them, open <strong>about:addons</strong>, click the gear icon, then
