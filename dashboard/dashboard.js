@@ -258,13 +258,15 @@ function fitShortcutsCard(card) {
 }
 
 // Re-check when the card's width changes (window resized, dialog opened).
-// Height changes from stacking itself are ignored, so this can't loop.
+// The re-check changes the card's own layout, so it runs on the next frame,
+// outside the observer callback; otherwise the browser reports a
+// "ResizeObserver loop" error. Height changes from stacking are ignored.
 const shortcutsCardObserver = new ResizeObserver(entries => {
   for (const { target, contentRect } of entries) {
     const width = String(Math.round(contentRect.width));
     if (target.dataset.width === width) continue;
     target.dataset.width = width;
-    fitShortcutsCard(target);
+    requestAnimationFrame(() => fitShortcutsCard(target));
   }
 });
 document.querySelectorAll('.shortcuts-card').forEach(card => shortcutsCardObserver.observe(card));
