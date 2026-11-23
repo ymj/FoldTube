@@ -1,7 +1,7 @@
 // Auto-collapse on window close: the "always" rules.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { autoCollapseVideo } from '../lib/fold.js';
+import { autoCollapseVideo, tabSnapshotEntry, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
 import { reconcileRestoredTabs, isPendingRestoreCheck, applyVideoOp, patchVideos } from '../lib/store.js';
 
 const tabData = { url: 'https://www.youtube.com/watch?v=abc', title: 'A video - YouTube' };
@@ -83,5 +83,76 @@ describe('reconcileRestoredTabs', () => {
     const { videos } = applyVideoOp(existing, { type: 'add', videos: [autoCollapseVideo({ isWindowClosing: true }, on, tabData)] });
     assert.equal(videos, existing);
     assert.equal(reconcileRestoredTabs(videos, new Set(['abc'])).videos.length, 1);
+  });
+});
+
+describe('open-tabs list (write-ahead)', () => {
+  const yt = (id, videoId, title = `Video ${videoId} - YouTube`) =>
+    ({ id, url: `https://www.youtube.com/watch?v=${videoId}`, title });
+
+  test('lists YouTube video tabs only', () => {
+    assert.deepEqual(tabSnapshotEntry(yt(1, 'abc')), { url: 'https://www.youtube.com/watch?v=abc', title: 'Video abc - YouTube' });
+    assert.equal(tabSnapshotEntry({ url: 'https://www.youtube.com/' }), null);
+    assert.equal(tabSnapshotEntry({ url: 'https://example.com/watch?v=abc' }), null);
+    assert.equal(tabSnapshotEntry({ url: 'chrome://newtab/' }), null);
+    assert.equal(tabSnapshotEntry({}), null);
+  });
+
+  test('buildTabSnapshot keys entries by tab ID', () => {
+    const snap = buildTabSnapshot([yt(1, 'a'), { id: 2, url: 'https://example.com/' }, yt(3, 'c')]);
+    assert.deepEqual(Object.keys(snap), ['1', '3']);
+  });
+
+  test('updateTabSnapshot adds, updates, drops, and skips no-ops', () => {
+    let snap = {};
+    snap = updateTabSnapshot(snap, 1, yt(1, 'a', 'YouTube'));
+    snap = updateTabSnapshot(snap, 1, yt(1, 'a'));
+    assert.equal(snap[1].title, 'Video a - YouTube', 'title updated once the page loads');
+
+    const same = updateTabSnapshot(snap, 1, yt(1, 'a'));
+    assert.equal(same, snap, 'unchanged: same object, no write');
+
+    snap = updateTabSnapshot(snap, 1, { id: 1, url: 'https://www.google.com/' });
+    assert.deepEqual(snap, {}, 'navigated away from YouTube: dropped');
+    assert.equal(updateTabSnapshot(snap, 2, { url: 'https://example.com/' }), snap);
+  });
+
+  test('quit with 30 tabs, none restored: all 30 recovered', () => {
+    const tabs = Array.from({ length: 30 }, (_, i) => yt(i + 1, `v${i}`));
+    const videos = recoverClosedTabs(buildTabSnapshot(tabs), new Set(), on);
+    assert.equal(videos.length, 30);
+    assert.equal(videos[0].title, 'Video v0');
+    assert.equal(videos[0].metadataSource, 'auto-collapsed');
+  });
+
+  test('restored tabs are not recovered, so no duplicates', () => {
+    const snap = buildTabSnapshot([yt(1, 'a'), yt(2, 'b'), yt(3, 'c')]);
+    const videos = recoverClosedTabs(snap, new Set(['a', 'c']), on);
+    assert.deepEqual(videos.map(v => v.videoId), ['b']);
+  });
+
+  test('auto-collapse off: nothing recovered', () => {
+    const snap = buildTabSnapshot([yt(1, 'a')]);
+    assert.deepEqual(recoverClosedTabs(snap, new Set(), off), []);
+    assert.deepEqual(recoverClosedTabs(snap, new Set(), {}), []);
+  });
+
+  test('a tab closed on purpose is dropped from the list, so it is never recovered', () => {
+    const snap = buildTabSnapshot([yt(1, 'a'), yt(2, 'b')]);
+    const { 1: _closed, ...rest } = snap;
+    assert.deepEqual(recoverClosedTabs(rest, new Set(), on).map(v => v.videoId), ['b']);
+  });
+
+  test('a tab saved on close and also recovered is stored once', () => {
+    const liveSave = autoCollapseVideo({ isWindowClosing: true }, on, tabData);
+    let { videos } = applyVideoOp([], { type: 'add', videos: [liveSave] });
+    const recovered = recoverClosedTabs(buildTabSnapshot([{ id: 1, ...tabData }]), new Set(), on);
+    ({ videos } = applyVideoOp(videos, { type: 'add', videos: recovered }));
+    assert.deepEqual(videos.map(v => v.videoId), ['abc']);
+  });
+
+  test('a malformed stored list is ignored', () => {
+    assert.deepEqual(recoverClosedTabs(undefined, new Set(), on), []);
+    assert.deepEqual(recoverClosedTabs({ 1: null, 2: { url: 42 } }, new Set(), on), []);
   });
 });
