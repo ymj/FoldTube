@@ -17,6 +17,15 @@
     </div>
     <div class="header-controls" style="display: flex; align-items: center;">
       <span class="video-count">0 items</span>
+      <button id="btn-history" class="history-btn" title="Videos you opened or removed">
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+        History
+      </button>
       <button id="btn-help" class="help-btn" title="Help" aria-label="Help">?</button>
       <button id="btn-settings" class="settings-btn" title="Settings" aria-label="Settings">⚙️</button>
     </div>
@@ -94,6 +103,7 @@
           <span class="line">Click the FoldTube icon<span data-shortcut-wrap="_execute_action"> or press
               <kbd data-shortcut="_execute_action"></kbd></span></span>
           <span class="line">anytime to fold new tabs.</span>
+          <span class="line">Videos you opened or removed are in History.</span>
         </p>
       </div>
 
@@ -122,6 +132,26 @@
     <div id="shorts-section" class="section hidden">
       <h2 class="section-title">Shorts</h2>
       <div id="shorts-grid" class="video-grid shorts-grid"></div>
+    </div>
+  </main>
+
+  <main id="history-view" class="main-content history-view hidden" aria-labelledby="history-title">
+    <div class="history-top">
+      <button id="btn-history-back" class="history-back">← Library</button>
+      <h2 id="history-title">History</h2>
+    </div>
+    <div class="history-controls">
+      <input type="search" id="history-search" placeholder="Search history..." aria-label="Search history" />
+      <button id="btn-clear-history" class="btn-pill btn-pill-secondary history-clear">Clear history</button>
+    </div>
+    <p class="history-note">Videos you open or remove stay here for 90 days.</p>
+    <div id="history-list" class="history-list"></div>
+    <div id="history-empty" class="empty-state history-empty hidden">
+      <p>Nothing here yet. Videos you open or remove stay here for 90 days.</p>
+    </div>
+    <div id="history-no-results" class="empty-state history-empty hidden">
+      <h2>No matches</h2>
+      <p>Try a different search.</p>
     </div>
   </main>
 

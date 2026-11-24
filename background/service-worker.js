@@ -121,8 +121,8 @@ function videoIdsOfTabs(tabs) {
 // is installed, updated or reloaded: that marks a new session.
 const SESSION_FLAG = "foldtubeSessionStarted";
 
-// A new session: save what the last one left open and didn't get back, drop
-// duplicates of restored tabs, then list the tabs open now.
+// A new session: save what the last one left open and didn't get back, move
+// restored tabs to History, drop expired history, then list the tabs open now.
 const sessionReady = enqueueSnapshot(async () => {
   await migrated;
   if ((await chrome.storage.session.get(SESSION_FLAG))[SESSION_FLAG]) return;
@@ -138,10 +138,17 @@ const sessionReady = enqueueSnapshot(async () => {
     fillInMetadata();
   }
 
-  // A video saved on window close whose tab the browser restored is a
-  // duplicate; the rest are kept and marked checked (see lib/store.js).
-  const { removed } = await mutateSavedVideos(videos => reconcileRestoredTabs(videos, openIds));
-  if (removed.length) console.log(`FoldTube: removed ${removed.length} restored tab(s) already open.`);
+  // A video saved on window close whose tab the browser restored is open
+  // again: it moves to History as watched. The rest are kept and marked
+  // checked (see lib/store.js).
+  const ctx = await changeContext();
+  const { reopened } = await mutateSavedVideos(videos => reconcileRestoredTabs(videos, openIds, ctx));
+  if (reopened.length) console.log(`FoldTube: ${reopened.length} restored tab(s) already open moved to History.`);
+
+  // History older than 90 days is dropped once per browser session (and
+  // each time the dashboard opens).
+  const { purged } = await applyOp({ type: 'purge' });
+  if (purged) console.log(`FoldTube: dropped ${purged} history entr${purged === 1 ? 'y' : 'ies'} older than 90 days.`);
 
   await writeTabSnapshot(buildTabSnapshot(tabs));
   await chrome.storage.session.set({ [SESSION_FLAG]: true });
@@ -491,7 +498,7 @@ async function runEnrichment() {
 
 // ---- Messages from the dashboard ----
 
-const DASHBOARD_OPS = new Set(['import', 'remove', 'restore']);
+const DASHBOARD_OPS = new Set(['import', 'archive', 'unarchive', 'forget', 'clearHistory', 'purge']);
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Only this extension's own pages may change the library.

@@ -1123,3 +1123,224 @@ input:checked+.slider:before {
 #undo-toast button:hover {
   background: rgba(62, 166, 255, 0.12);
 }
+/* ════════════════════════════════════════
+   History
+   ════════════════════════════════════════ */
+
+.history-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 16px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+}
+
+.history-btn:hover,
+.history-btn[aria-pressed="true"] {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+  background: var(--surface-hover);
+}
+
+.history-view {
+  max-width: 900px;
+}
+
+.history-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.history-top h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.history-back {
+  padding: 6px 12px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.history-back:hover {
+  background: var(--surface-hover);
+}
+
+.history-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+#history-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 12px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background-color: var(--surface-color);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.history-clear {
+  min-width: 0;
+  padding: 8px 18px;
+  font-size: 0.9rem;
+}
+
+.history-note {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.history-empty {
+  margin-top: 64px;
+}
+
+.history-day {
+  margin: 28px 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  margin-bottom: 8px;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.history-row.row-exit {
+  opacity: 0;
+  transform: translateX(-12px);
+}
+
+.history-thumb {
+  flex: none;
+  width: 120px;
+  height: 68px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--skeleton-base);
+}
+
+.history-thumb.short {
+  width: 38px;
+  margin: 0 41px;
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-info .title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-info .channel {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.history-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+}
+
+.history-badge.watched {
+  color: var(--selection-color);
+  border-color: currentColor;
+}
+
+.history-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.history-actions button {
+  padding: 6px 12px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.history-actions button:hover {
+  background: var(--surface-hover);
+}
+
+.history-actions .history-restore {
+  color: var(--selection-color);
+  font-weight: 600;
+}
+
+.history-actions .history-forget:hover {
+  color: var(--accent-color);
+}
+
+@media (max-width: 600px) {
+  .history-row {
+    flex-wrap: wrap;
+  }
+
+  .history-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

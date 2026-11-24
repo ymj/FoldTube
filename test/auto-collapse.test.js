@@ -37,15 +37,19 @@ describe('autoCollapseVideo', () => {
 describe('reconcileRestoredTabs', () => {
   const saved = (videoId, extra) => ({ videoId, metadataSource: 'scrape', ...extra });
 
-  test('a restored tab leaves no duplicate, even after enrichment relabelled it', () => {
+  test('a restored tab moves to History as watched, even after enrichment relabelled it', () => {
     // Saved on close, then enriched before the browser restarted.
     let videos = [autoCollapseVideo({ isWindowClosing: true }, on, tabData), saved('keep')];
     videos = patchVideos(videos, new Map([['abc', { metadataSource: 'api-enriched', channelName: 'Chan' }]])).videos;
     assert.equal(videos[0].metadataSource, 'api-enriched');
 
-    const { videos: after, result } = reconcileRestoredTabs(videos, new Set(['abc']));
-    assert.deepEqual(after.map(v => v.videoId), ['keep']);
-    assert.equal(result.removed[0].video.videoId, 'abc');
+    const { videos: after, result } = reconcileRestoredTabs(videos, new Set(['abc']), { deviceId: 'dev', now: new Date('2026-11-24T10:00:00Z') });
+    assert.deepEqual(after.map(v => v.videoId), ['abc', 'keep'], 'nothing removed');
+    assert.equal(after[0].state, 'watched');
+    assert.equal(after[0].stateChangedAt, '2026-11-24T10:00:00.000Z');
+    assert.equal(after[0].stateChangedBy, 'dev');
+    assert.equal(after[0].pendingRestoreCheck, false);
+    assert.deepEqual(result.reopened, ['abc']);
   });
 
   test('a video saved on close whose tab was not restored is kept and marked checked', () => {
@@ -61,19 +65,20 @@ describe('reconcileRestoredTabs', () => {
     videos = reconcileRestoredTabs(videos, new Set()).videos;      // first startup: not restored
     videos = reconcileRestoredTabs(videos, new Set(['abc'])).videos; // weeks later: user opened it again
     assert.deepEqual(videos.map(v => v.videoId), ['abc']);
+    assert.notEqual(videos[0].state, 'watched');
   });
 
   test('videos saved by a fold or import are never removed, even if open', () => {
     const videos = [saved('abc'), saved('def', { metadataSource: 'url-only' })];
     const { videos: after, result } = reconcileRestoredTabs(videos, new Set(['abc', 'def']));
     assert.equal(after, videos, 'nothing to check: same array, no write');
-    assert.deepEqual(result.removed, []);
+    assert.deepEqual(result.reopened, []);
   });
 
   test('older libraries: an unmarked auto-collapsed entry is checked once', () => {
     const legacy = { videoId: 'abc', metadataSource: 'auto-collapsed' };
     assert.equal(isPendingRestoreCheck(legacy), true);
-    assert.deepEqual(reconcileRestoredTabs([legacy], new Set(['abc'])).videos, []);
+    assert.equal(reconcileRestoredTabs([legacy], new Set(['abc'])).videos[0].state, 'watched');
     const kept = reconcileRestoredTabs([legacy], new Set()).videos;
     assert.equal(isPendingRestoreCheck(kept[0]), false);
   });
@@ -82,7 +87,7 @@ describe('reconcileRestoredTabs', () => {
     const existing = [saved('abc')];
     const { videos } = applyVideoOp(existing, { type: 'add', videos: [autoCollapseVideo({ isWindowClosing: true }, on, tabData)] });
     assert.equal(videos, existing);
-    assert.equal(reconcileRestoredTabs(videos, new Set(['abc'])).videos.length, 1);
+    assert.equal(reconcileRestoredTabs(videos, new Set(['abc'])).videos, videos);
   });
 });
 

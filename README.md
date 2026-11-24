@@ -23,6 +23,7 @@ FoldTube is a powerful YouTube tab manager that helps you take back control of y
 - **Metadata enrichment** via the YouTube Data API v3 (channel names, durations for sleeping tabs)
 - **Import / Export** your library as JSON or a shareable HTML bookmark page
 - **Instant Undo** for accidental deletions
+- **History**: videos you open or remove stay there for 90 days, so you can put them back or delete them for good
 
 
 ---
