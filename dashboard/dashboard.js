@@ -2,8 +2,8 @@ import {
   validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor, YOUTUBE_TAB_PATTERNS, countFoldableTabs,
   resumeSeconds, openUrlFor, formatDuration, buildJsonExport,
 } from '../lib/youtube.js';
-import { decodeStored, isActive, daysLeft } from '../lib/archive.js';
-import { matchesSearch, historyItems, groupByDay, expiryLabel } from '../lib/history.js';
+import { decodeStored, isActive, isBackInLibrary, daysLeft } from '../lib/archive.js';
+import { matchesSearch, historyItems, groupByDay, expiryLabel, HISTORY_FILTERS } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 
 let allVideos = [];
@@ -818,6 +818,7 @@ async function openSingleVideo(video, cardElement) {
 
 let historyOpen = false;
 let historyQuery = '';
+let historyFilter = 'all';
 
 function showHistory(open) {
   historyOpen = open;
@@ -846,11 +847,23 @@ function bindHistory() {
     renderHistory();
   }, 150));
 
+  document.getElementById('history-filters').addEventListener('click', (e) => {
+    const pill = e.target.closest('.history-pill');
+    if (!pill) return;
+    historyFilter = pill.dataset.filter;
+    renderHistory();
+  });
+
   document.getElementById('btn-clear-history').addEventListener('click', async () => {
-    const count = historyItems(allRecords).length;
-    if (!count) return;
-    const what = count === 1 ? 'the video' : `all ${count} videos`;
-    if (!confirm(`Delete ${what} in History forever? This can't be undone.`)) return;
+    const items = historyItems(allRecords);
+    if (!items.length) return;
+    const gone = items.filter(v => !isActive(v)).length;
+    const back = items.length - gone;
+    const message = gone
+      ? `Clear History? ${gone} video${gone === 1 ? '' : 's'} you opened or removed will be deleted forever.`
+        + `${back ? ' Videos back in your library stay there.' : ''} This can't be undone.`
+      : 'Clear History? Videos back in your library stay there.';
+    if (!confirm(message)) return;
     await changeVideos({ type: 'clearHistory' });
   });
 
@@ -860,22 +873,35 @@ function bindHistory() {
     const row = button?.closest('.history-row');
     if (!row) return;
     button.disabled = true;
-    row.classList.add('row-exit');
-    const op = button.dataset.action === 'restore' ? 'unarchive' : 'forget';
+    // Restored videos stay listed, now marked as back in the library.
+    const restoring = button.dataset.action === 'restore';
+    if (!restoring || historyFilter !== 'all') row.classList.add('row-exit');
+    const op = restoring
+      ? { type: 'unarchive', videoIds: [row.dataset.id], fromHistory: true }
+      : { type: 'forget', videoIds: [row.dataset.id] };
     setTimeout(() => {
-      changeVideos({ type: op, videoIds: [row.dataset.id] }).catch(err => {
+      changeVideos(op).catch(err => {
         console.error('FoldTube: history change failed', err);
         row.classList.remove('row-exit');
         button.disabled = false;
       });
-    }, 200);
+    }, restoring ? 0 : 200);
   });
 }
 
 function renderHistory() {
   const all = historyItems(allRecords);
-  const items = historyQuery ? all.filter(v => matchesSearch(v, historyQuery)) : all;
+  const searched = historyQuery ? all.filter(v => matchesSearch(v, historyQuery)) : all;
+  const items = searched.filter(HISTORY_FILTERS[historyFilter]);
   const list = document.getElementById('history-list');
+
+  document.querySelectorAll('.history-pill').forEach(pill => {
+    const filter = pill.dataset.filter;
+    pill.setAttribute('aria-pressed', String(filter === historyFilter));
+    const count = searched.filter(HISTORY_FILTERS[filter]).length;
+    pill.querySelector('.pill-count').textContent = ` ${count}`;
+  });
+  document.getElementById('history-filters').classList.toggle('hidden', all.length === 0);
 
   document.querySelector('.video-count').classList.remove('hidden');
   document.querySelector('.video-count').textContent = `${all.length} in History`;
@@ -899,8 +925,9 @@ function renderHistory() {
 }
 
 function createHistoryRow(video, now) {
+  const back = isBackInLibrary(video);
   const row = document.createElement('div');
-  row.className = 'history-row';
+  row.className = back ? 'history-row back-in-library' : 'history-row';
   row.dataset.id = video.videoId;
 
   const img = document.createElement('img');
@@ -922,16 +949,30 @@ function createHistoryRow(video, now) {
 
   const meta = document.createElement('div');
   meta.className = 'history-meta';
+  // What happened (watched or deleted), then where the video is now.
+  const how = back ? video.archivedAs : video.state;
   const badge = document.createElement('span');
-  badge.className = `history-badge ${video.state}`;
-  badge.textContent = video.state === 'watched' ? 'Watched' : 'Deleted';
-  const expiry = document.createElement('span');
-  expiry.textContent = expiryLabel(daysLeft(video, now));
-  meta.append(badge, expiry);
+  badge.className = `history-badge ${how}`;
+  badge.textContent = how === 'watched' ? 'Watched' : 'Deleted';
+  meta.appendChild(badge);
+  if (back) {
+    const where = document.createElement('span');
+    where.className = 'history-badge library';
+    where.textContent = 'Back in library';
+    meta.appendChild(where);
+  } else {
+    const expiry = document.createElement('span');
+    expiry.textContent = expiryLabel(daysLeft(video, now));
+    meta.appendChild(expiry);
+  }
   info.append(title, channel, meta);
 
   const actions = document.createElement('div');
   actions.className = 'history-actions';
+  if (back) {
+    row.append(img, info, actions);
+    return row;
+  }
   const restore = document.createElement('button');
   restore.className = 'history-restore';
   restore.dataset.action = 'restore';

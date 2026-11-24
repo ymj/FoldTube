@@ -144,6 +144,12 @@
       <input type="search" id="history-search" placeholder="Search history..." aria-label="Search history" />
       <button id="btn-clear-history" class="btn-pill btn-pill-secondary history-clear">Clear history</button>
     </div>
+    <div id="history-filters" class="duration-filters history-filters" role="group" aria-label="Show">
+      <button class="history-pill" data-filter="all" aria-pressed="true">All<span class="pill-count"></span></button>
+      <button class="history-pill" data-filter="watched" aria-pressed="false">Watched<span class="pill-count"></span></button>
+      <button class="history-pill" data-filter="deleted" aria-pressed="false">Deleted<span class="pill-count"></span></button>
+      <button class="history-pill" data-filter="library" aria-pressed="false">Back in library<span class="pill-count"></span></button>
+    </div>
     <p class="history-note">Videos you open or remove stay here for 90 days.</p>
     <div id="history-list" class="history-list"></div>
     <div id="history-empty" class="empty-state history-empty hidden">
@@ -151,7 +157,7 @@
     </div>
     <div id="history-no-results" class="empty-state history-empty hidden">
       <h2>No matches</h2>
-      <p>Try a different search.</p>
+      <p>Try a different search or filter.</p>
     </div>
   </main>
 

@@ -451,7 +451,8 @@ body {
   flex-wrap: wrap;
 }
 
-.filter-pill {
+.filter-pill,
+.history-pill {
   padding: 6px 14px;
   border-radius: 16px;
   border: 1px solid var(--border-color);
@@ -462,11 +463,13 @@ body {
   transition: all var(--transition-speed);
 }
 
-.filter-pill:hover {
+.filter-pill:hover,
+.history-pill:hover {
   background-color: var(--surface-hover);
 }
 
-.filter-pill.active {
+.filter-pill.active,
+.history-pill[aria-pressed="true"] {
   background-color: var(--text-primary);
   color: var(--bg-color);
   border-color: var(--text-primary);
@@ -1207,6 +1210,15 @@ input:checked+.slider:before {
   font-size: 0.9rem;
 }
 
+.history-filters {
+  margin-top: 14px;
+}
+
+.history-pill .pill-count {
+  margin-left: 4px;
+  opacity: 0.65;
+}
+
 .history-note {
   margin: 10px 0 0;
   font-size: 0.85rem;
@@ -1296,6 +1308,20 @@ input:checked+.slider:before {
   font-size: 0.75rem;
   font-weight: 600;
   border: 1px solid var(--border-color);
+}
+
+.history-badge.library {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+  border-color: transparent;
+}
+
+/* Back in the library: still listed, but quieter. */
+.history-row.back-in-library .history-thumb,
+.history-row.back-in-library .history-info .title,
+.history-row.back-in-library .history-badge.watched,
+.history-row.back-in-library .history-badge.deleted {
+  opacity: 0.55;
 }
 
 .history-badge.watched {
