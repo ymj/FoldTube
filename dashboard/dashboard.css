@@ -942,6 +942,11 @@ body {
   opacity: 0.8;
 }
 
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ════════════════════════════════════════
    Theme Selector
    ════════════════════════════════════════ */
@@ -1205,9 +1210,24 @@ input:checked+.slider:before {
 }
 
 .history-clear {
-  min-width: 0;
-  padding: 8px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
   font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.history-clear:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
 }
 
 .history-filters {

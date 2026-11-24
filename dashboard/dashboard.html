@@ -139,10 +139,19 @@
     <div class="history-top">
       <button id="btn-history-back" class="history-back">← Library</button>
       <h2 id="history-title">History</h2>
+      <button id="btn-clear-history" class="history-clear">
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="M19 6l-1 14H6L5 6" />
+          <path d="M10 11v6M14 11v6" />
+        </svg>
+        Clear history
+      </button>
     </div>
     <div class="history-controls">
       <input type="search" id="history-search" placeholder="Search history..." aria-label="Search history" />
-      <button id="btn-clear-history" class="btn-pill btn-pill-secondary history-clear">Clear history</button>
     </div>
     <div id="history-filters" class="duration-filters history-filters" role="group" aria-label="Show">
       <button class="history-pill" data-filter="all" aria-pressed="true">All<span class="pill-count"></span></button>
@@ -237,6 +246,14 @@
               <button id="btn-export-html" class="btn-secondary">Export to HTML</button>
               <button id="btn-import-trigger" class="btn-secondary">Import from JSON</button>
               <input type="file" id="import-file" accept=".json" class="hidden">
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <h3>History</h3>
+            <p id="settings-history-note">Videos you open or remove stay in History for 90 days.</p>
+            <div class="setting-actions">
+              <button id="btn-settings-clear-history" class="btn-secondary">Clear history</button>
             </div>
           </div>
         </div>

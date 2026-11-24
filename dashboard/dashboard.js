@@ -116,6 +116,7 @@ async function init() {
         }
         if (historyOpen) renderHistory();
         else processAndRender();
+        renderSettingsHistory();
       }
       if (changes.apiError) {
         const banner = document.getElementById('api-error-banner');
@@ -383,6 +384,7 @@ function bindControls() {
   // Bindings are re-read each time: they may have changed since last time.
   const openSettings = () => {
     selectSettingsTab('general');
+    renderSettingsHistory();
     renderShortcuts(document.getElementById('shortcut-list'));
     settingsModal.showModal();
   };
@@ -854,18 +856,8 @@ function bindHistory() {
     renderHistory();
   });
 
-  document.getElementById('btn-clear-history').addEventListener('click', async () => {
-    const items = historyItems(allRecords);
-    if (!items.length) return;
-    const gone = items.filter(v => !isActive(v)).length;
-    const back = items.length - gone;
-    const message = gone
-      ? `Clear History? ${gone} video${gone === 1 ? '' : 's'} you opened or removed will be deleted forever.`
-        + `${back ? ' Videos back in your library stay there.' : ''} This can't be undone.`
-      : 'Clear History? Videos back in your library stay there.';
-    if (!confirm(message)) return;
-    await changeVideos({ type: 'clearHistory' });
-  });
+  document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
+  document.getElementById('btn-settings-clear-history').addEventListener('click', clearHistory);
 
   // One listener for every row.
   document.getElementById('history-list').addEventListener('click', (e) => {
@@ -887,6 +879,29 @@ function bindHistory() {
       });
     }, restoring ? 0 : 200);
   });
+}
+
+// From the History screen and from Settings → Advanced.
+async function clearHistory() {
+  const items = historyItems(allRecords);
+  if (!items.length) return;
+  const gone = items.filter(v => !isActive(v)).length;
+  const back = items.length - gone;
+  const message = gone
+    ? `Clear History? ${gone} video${gone === 1 ? '' : 's'} you opened or removed will be deleted forever.`
+      + `${back ? ' Videos back in your library stay there.' : ''} This can't be undone.`
+    : 'Clear History? Videos back in your library stay there.';
+  if (!confirm(message)) return;
+  await changeVideos({ type: 'clearHistory' });
+}
+
+// The History line in Settings → Advanced.
+function renderSettingsHistory() {
+  const count = historyItems(allRecords).length;
+  document.getElementById('settings-history-note').textContent = count
+    ? `${count} video${count === 1 ? '' : 's'} in History. Videos you open or remove stay there for 90 days.`
+    : 'History is empty. Videos you open or remove stay there for 90 days.';
+  document.getElementById('btn-settings-clear-history').disabled = count === 0;
 }
 
 function renderHistory() {
