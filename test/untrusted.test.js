@@ -77,7 +77,7 @@ describe('sanitizeImportedVideo', () => {
   test('keeps only known fields', () => {
     assert.deepEqual(Object.keys(clean).sort(), [
       'channelName', 'channelUrl', 'dateSaved', 'description', 'durationFormatted',
-      'durationSeconds', 'metadataSource', 'thumbnailUrl', 'title', 'url', 'videoId', 'videoType',
+      'durationSeconds', 'metadataSource', 'thumbnailUrl', 'timestampSeconds', 'title', 'url', 'videoId', 'videoType',
     ]);
   });
 
@@ -148,7 +148,9 @@ describe('buildHtmlExport', () => {
 
   test('a YouTube link is kept, escaped, as the href', () => {
     const html = buildHtmlExport([malicious], labels);
-    assert.match(html, /href="https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ&quot;&gt;&lt;script&gt;/);
+    // The URL is rebuilt to set the resume position, which also encodes the payload.
+    assert.match(html, /href="https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ%22%3E%3Cscript%3E/);
+    assertNoPayload(html);
   });
 
   test('a non-YouTube link is left out', () => {

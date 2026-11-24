@@ -15,6 +15,7 @@ FoldTube is a powerful YouTube tab manager that helps you take back control of y
 - **Right-click menu**: fold the YouTube video page you're on, or save a link to a YouTube video without opening it
 - **Quick dashboard** without folding tabs via `Ctrl+Shift+U` (Windows/Linux) / `Cmd+Shift+U` (Mac)
 - **Organized dashboard** with separate sections for Videos and Shorts
+- **Pick up where you left off**: folding a video remembers how far you got, and opening it resumes from there
 - **Light, Dark, and System theme** — follows your OS preference by default, or override it in Settings
 - **Real-time search**, multiple sorting options, and duration filter pills
 - **Bulk actions** — select, open, or remove multiple tabs at once

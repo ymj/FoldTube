@@ -1,7 +1,7 @@
 /* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
 import { showSavedMark } from '../content/saved-mark.js';
-import { parseVideoUrl, parseIsoDuration, formatDuration, YOUTUBE_TAB_PATTERNS } from '../lib/youtube.js';
+import { parseVideoUrl, parseIsoDuration, formatDuration, positionFromPlayer, YOUTUBE_TAB_PATTERNS } from '../lib/youtube.js';
 import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
 import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults } from '../lib/oembed.js';
@@ -142,36 +142,40 @@ async function scrapeTab(tab) {
   });
   const metadata = results[0]?.result;
   if (!metadata) return null;
+  let player = null;
   try {
-    const durResults = await chrome.scripting.executeScript({
+    const playerResults = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       world: 'MAIN',
       func: () => {
         try {
-          const player = document.querySelector('#movie_player');
-          if (player && typeof player.getDuration === 'function') {
-            const data = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
-            const lengthSec = data?.video_quality_features?.length_seconds
-              || (typeof player.getDuration === 'function' ? player.getDuration() : 0);
-            if (typeof ytInitialPlayerResponse !== 'undefined') {
-              const ls = parseInt(ytInitialPlayerResponse?.videoDetails?.lengthSeconds, 10);
-              if (ls > 0) return ls;
-            }
-            return lengthSec || 0;
-          }
+          let duration = 0;
+          const p = document.querySelector('#movie_player');
+          const data = p && typeof p.getVideoData === 'function' ? p.getVideoData() : null;
           if (typeof ytInitialPlayerResponse !== 'undefined') {
-            return parseInt(ytInitialPlayerResponse?.videoDetails?.lengthSeconds, 10) || 0;
+            duration = parseInt(ytInitialPlayerResponse?.videoDetails?.lengthSeconds, 10) || 0;
           }
-          return 0;
-        } catch (_) { return 0; }
+          if (!duration && p && typeof p.getDuration === 'function') {
+            duration = data?.video_quality_features?.length_seconds || p.getDuration() || 0;
+          }
+          const position = p && typeof p.getCurrentTime === 'function' ? p.getCurrentTime() : null;
+          return {
+            duration,
+            position,
+            isLive: Boolean(data?.isLive),
+            adShowing: Boolean(p?.classList?.contains('ad-showing')),
+          };
+        } catch (_) { return null; }
       },
     });
-    const realDuration = Math.round(durResults[0]?.result || 0);
+    player = playerResults[0]?.result || null;
+    const realDuration = Math.round(player?.duration || 0);
     if (realDuration > 0) {
       metadata.durationSeconds = realDuration;
       metadata.durationFormatted = formatDuration(realDuration);
     }
-  } catch (_) { /* duration enrichment is best-effort */ }
+  } catch (_) { /* the player read is best-effort */ }
+  metadata.timestampSeconds = positionFromPlayer(metadata, player);
   return metadata;
 }
 
