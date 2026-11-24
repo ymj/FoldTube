@@ -125,7 +125,6 @@ FoldTube doesn't sell or share your data, and doesn't use it for anything other 
 - **youtube.com:** to find your open YouTube video tabs, and to read a video's title, channel and length from its page when you fold it. FoldTube can't see other websites.
 - **Storage:** to keep your list and settings in your browser.
 - **Notifications:** to tell you how many tabs were folded.
-- **Right-click menu:** to add "Fold this tab" and "Save to FoldTube". FoldTube only sees a link when you choose "Save to FoldTube" on it, and then briefly shows "Saved" on that page. It can't read or change the page otherwise.
 
 ### Deleting your data
 
