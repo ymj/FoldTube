@@ -57,54 +57,64 @@
     </header>
 
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: November 23, 2026</p>
+    <p class="updated">Last updated: November 24, 2026</p>
 
     <p class="summary">FoldTube is built to keep what you watch private. In short: your list stays in your browser,
       and FoldTube has no servers, accounts, ads, analytics, cookies or tracking. Nothing is ever sent to the
       developer.</p>
 
-    <h2>What FoldTube keeps, and where</h2>
-    <p>Everything below is stored in your browser, on your device. It isn't synced, and it isn't sent to the
-      developer.</p>
+    <h2>What FoldTube stores, and where</h2>
+    <p>Everything FoldTube stores lives only in your browser's local storage, on your device. It's never synced,
+      never sent to the developer, and the developer has no way to see it. This includes:</p>
     <ul>
-      <li><strong>The videos you save:</strong> the title, channel, length, link and thumbnail of each video, and
-        the date you saved it.</li>
+      <li><strong>The videos you save:</strong> the title, channel, length, link and thumbnail of each video, the
+        date you saved it, and where you stopped watching.</li>
+      <li><strong>Videos you open or remove:</strong> they move to History, so you can restore them. After 90 days
+        FoldTube deletes them.</li>
       <li><strong>Your settings:</strong> theme, auto-collapse, and your YouTube API key if you choose to add
         one.</li>
-      <li><strong>Your open YouTube video tabs:</strong> FoldTube keeps a short list of the YouTube videos open in
-        your browser, so they can still be saved if the browser quits while auto-collapse is on. A tab drops off
-        the list when you close it or leave YouTube.</li>
+      <li><strong>Your open YouTube video tabs:</strong> a short list of the YouTube videos open in your browser, so
+        they can still be saved if the browser quits while auto-collapse is on. A tab drops off the list when you
+        close it or leave YouTube.</li>
     </ul>
 
     <h2>What FoldTube sends, and to whom</h2>
-    <p>FoldTube talks only to YouTube and Google, directly from your browser:</p>
+    <p>FoldTube has no backend of its own. Any network requests go directly from your browser to YouTube or
+      Google:</p>
     <ul>
-      <li><strong>YouTube, for channel names.</strong> When a saved video has no channel name (for example, it was
-        saved from a sleeping tab), FoldTube asks YouTube for it using the video's ID. These requests carry no
-        cookies and aren't linked to your YouTube account.</li>
-      <li><strong>Google's YouTube Data API, only if you add a key.</strong> FoldTube then sends video IDs and your
-        key to Google to fill in channel names and lengths. You can remove the key at any time in Settings &rarr;
-        Advanced.</li>
-      <li><strong>YouTube itself, when you open a video.</strong> Opening a video, or YouTube, loads it in a normal
-        browser tab, just as if you had clicked a link. YouTube's own privacy policy applies there.</li>
+      <li><strong>YouTube (for missing channel names):</strong> if a saved video has no channel name (for example,
+        it was saved from a sleeping tab or from a link), FoldTube fetches it from YouTube using only the video's
+        ID. These requests carry no cookies and aren't linked to your YouTube or Google account.</li>
+      <li><strong>Google's YouTube Data API (optional):</strong> only if you add your own API key, FoldTube sends
+        video IDs and your key directly to Google to fetch missing channel names and lengths. You can remove your
+        key at any time in Settings &rarr; Advanced.</li>
     </ul>
-    <p>FoldTube doesn't sell or share your data, and doesn't use it for anything other than the features
-      above.</p>
+    <p>Opening a saved video loads YouTube in a normal browser tab, where YouTube's own privacy policy
+      applies.</p>
+    <p><strong>No selling, sharing or other use:</strong> your data never passes through the developer's servers,
+      because there are none. It's never collected, sold or shared, and never used for anything outside the
+      features described above.</p>
 
-    <h2>What FoldTube can access</h2>
+    <h2>What FoldTube can access (browser permissions)</h2>
     <ul>
-      <li><strong>youtube.com:</strong> to find your open YouTube video tabs, and to read a video's title, channel
-        and length from its page when you fold it. FoldTube can't see other websites.</li>
-      <li><strong>Storage:</strong> to keep your list and settings in your browser.</li>
-      <li><strong>Notifications:</strong> to tell you how many tabs were folded.</li>
+      <li><strong>YouTube (youtube.com):</strong> used only to find your open YouTube tabs, and to read a video's
+        title, channel and length when you fold it.</li>
+      <li><strong>Other websites:</strong> only when you right-click a link to a YouTube video and choose "Save to
+        FoldTube", to briefly show a "Saved" confirmation on that page. FoldTube reads nothing from other
+        websites.</li>
+      <li><strong>Browser storage:</strong> used to save your video list and preferences on your device.</li>
+      <li><strong>Notifications:</strong> used only to confirm how many tabs were folded.</li>
     </ul>
 
     <h2>Deleting your data</h2>
-    <p>Uninstalling FoldTube deletes everything it stored.</p>
+    <p>You're in full control of your data. Inside FoldTube you can remove videos from your list, delete them
+      forever from History, clear all history, or remove your API key at any time. After you delete a video
+      forever, FoldTube remembers only its ID, so it knows the video was deleted, and forgets that after 90 days.
+      Uninstalling FoldTube erases everything it stored from your browser.</p>
 
     <h2>Changes to this policy</h2>
-    <p>If FoldTube ever adds a feature that changes any of this, such as syncing across devices, this policy will
-      be updated first, with a new date at the top.</p>
+    <p>If a future update ever changes how FoldTube handles data, for example if optional sync between devices is
+      added, this policy will be updated beforehand, with a new date at the top.</p>
 
     <h2>Contact</h2>
     <p>Questions about privacy: <a href="mailto:hello+foldtube@osumapps.com">hello+foldtube@osumapps.com</a></p>
