@@ -899,8 +899,8 @@ async function clearHistory() {
 function renderSettingsHistory() {
   const count = historyItems(allRecords).length;
   document.getElementById('settings-history-count').textContent = count
-    ? `${count} video${count === 1 ? '' : 's'} saved`
-    : 'No videos saved';
+    ? `${count} video${count === 1 ? '' : 's'} in History`
+    : 'No videos in History';
   document.getElementById('btn-settings-clear-history').disabled = count === 0;
 }
 
