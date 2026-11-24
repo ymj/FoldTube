@@ -1139,6 +1139,7 @@ input:checked+.slider:before {
    skipped because it is in History. */
 .import-modal {
   max-width: 480px;
+  overflow: visible; /* the title tips may reach past the dialog's edge */
 }
 
 .import-body {
@@ -1247,6 +1248,53 @@ input:checked+.slider:before {
 
 .import-thumb:hover::after,
 .import-thumb:focus-visible::after {
+  opacity: 1;
+}
+
+/* The "+N" tile lists the next titles, one per row. */
+.import-thumb.more::after {
+  content: none;
+}
+
+.import-more-list {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  border-radius: 8px;
+  background: var(--text-primary);
+  color: var(--bg-color);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: start;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 1;
+}
+
+.import-more-list li {
+  padding: 6px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
+}
+
+.import-more-list li + li {
+  border-top: 1px solid color-mix(in srgb, var(--bg-color) 18%, transparent);
+}
+
+.import-more-list li.rest {
+  opacity: 0.7;
+}
+
+.import-thumb.more:hover .import-more-list,
+.import-thumb.more:focus-visible .import-more-list {
   opacity: 1;
 }
 

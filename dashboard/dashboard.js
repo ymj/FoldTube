@@ -898,9 +898,19 @@ function showImportResult({ added, inLibrary = 0, skipped = [] }, backup) {
     more.className = 'import-thumb more';
     more.tabIndex = 0;
     more.textContent = `+${rest.length}`;
+    // A list, not the plain one-line tip: one title per row, divided.
     const listed = rest.slice(0, 5).map(titleOf);
     if (rest.length > 5) listed.push(`and ${rest.length - 5} more`);
-    more.dataset.title = listed.join('\n');
+    const tip = document.createElement('ul');
+    tip.className = 'import-more-list';
+    tip.setAttribute('aria-hidden', 'true');
+    tip.replaceChildren(...listed.map((text, i) => {
+      const li = document.createElement('li');
+      li.textContent = text;
+      if (rest.length > 5 && i === listed.length - 1) li.className = 'rest';
+      return li;
+    }));
+    more.appendChild(tip);
     more.setAttribute('aria-label', `${rest.length} more: ${listed.join(', ')}`);
     thumbs.push(more);
   }
