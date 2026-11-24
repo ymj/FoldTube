@@ -93,6 +93,15 @@ function fakeMenus() {
           state.lastError = undefined;
         });
       },
+      update(id, props, done) {
+        tick().then(() => {
+          state.lastError = state.items.has(id) ? undefined : { message: `Cannot find menu item with id ${id}` };
+          if (!state.lastError) state.items.set(id, { id, ...props });
+          state.updates = (state.updates ?? 0) + 1;
+          done();
+          state.lastError = undefined;
+        });
+      },
     },
   };
 }
@@ -107,15 +116,49 @@ describe('setting up the menus', () => {
     assert.deepEqual(menus.state.errors, []);
   });
 
-  test('a create error is read and logged, and later setups still run', async () => {
+  test('menus the browser restored after the clear are updated, not reported as errors', async () => {
     const menus = fakeMenus();
     const errors = [];
-    menus.api.removeAll = async () => {}; // leaves the old items in place
-    menus.state.items.set(MENU_FOLD_TAB, {});
+    // Chrome restores its saved menus on reload: they are back by the time
+    // FoldTube creates its own.
+    menus.api.removeAll = async () => {
+      menus.state.items.clear();
+      menus.state.items.set(MENU_FOLD_TAB, { id: MENU_FOLD_TAB, title: 'old' });
+      menus.state.items.set(MENU_SAVE_LINK, { id: MENU_SAVE_LINK, title: 'old' });
+    };
+    const install = createMenuInstaller(menus.api, menus.lastError, (...a) => errors.push(a.join(' ')));
+    await install();
+    assert.deepEqual(errors, []);
+    assert.equal(menus.state.updates, 2);
+    assert.deepEqual([...menus.state.items.values()].map(m => m.title), menuItems().map(m => m.title));
+  });
+
+  test('Firefox wording of the same error is handled too', async () => {
+    const menus = fakeMenus();
+    const errors = [];
+    const create = menus.api.create;
+    menus.api.create = (item, done) => Promise.resolve().then(() => {
+      if (menus.state.items.has(item.id)) { menus.state.lastError = { message: `ID already exists: ${item.id}` }; done(); menus.state.lastError = undefined; }
+      else create(item, done);
+    });
+    menus.api.removeAll = async () => { menus.state.items.set(MENU_FOLD_TAB, { id: MENU_FOLD_TAB }); };
+    await createMenuInstaller(menus.api, menus.lastError, (...a) => errors.push(a.join(' ')))();
+    assert.deepEqual(errors, []);
+    assert.equal(menus.state.updates, 1);
+  });
+
+  test('other errors are read and logged, and later setups still run', async () => {
+    const menus = fakeMenus();
+    const errors = [];
+    const create = menus.api.create;
+    menus.api.create = (item, done) => (item.id === MENU_SAVE_LINK
+      ? Promise.resolve().then(() => { menus.state.lastError = { message: 'Invalid url pattern' }; done(); menus.state.lastError = undefined; })
+      : create(item, done));
     const install = createMenuInstaller(menus.api, menus.lastError, (...a) => errors.push(a.join(' ')));
     await install();
     assert.equal(errors.length, 1);
-    assert.match(errors[0], /fold-this-tab.*duplicate id/);
+    assert.match(errors[0], /save-link.*Invalid url pattern/);
+    menus.api.create = create;
     menus.api.removeAll = async () => { throw new Error('boom'); };
     await install();
     assert.match(errors[1], /failed to create menus.*boom/);
