@@ -5,6 +5,7 @@ import {
 import { decodeStored, isActive, isBackInLibrary, daysLeft } from '../lib/archive.js';
 import { matchesSearch, historyItems, groupByDay, expiryLabel, HISTORY_FILTERS } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
+import { badgeMode, DEFAULT_BADGE_MODE } from '../lib/badge.js';
 
 let allVideos = [];
 let selectedVideoIds = new Set();
@@ -15,7 +16,8 @@ let currentDurationFilter = null;
 let appSettings = {
   autoCollapse: false,
   apiKey: '',
-  theme: 'system' // 'system' | 'light' | 'dark'
+  theme: 'system', // 'system' | 'light' | 'dark'
+  badge: DEFAULT_BADGE_MODE, // what the toolbar icon counts: 'tabs' | 'library' | 'off'
 };
 
 // Undo state
@@ -78,6 +80,8 @@ async function loadSettings() {
   // Apply persisted theme and sync the selector
   applyTheme(appSettings.theme);
   document.getElementById('theme-select').value = appSettings.theme;
+  appSettings.badge = badgeMode(appSettings);
+  document.getElementById('badge-select').value = appSettings.badge;
 }
 
 async function saveSettings() {
@@ -440,6 +444,12 @@ function bindControls() {
   // Settings
   document.getElementById('auto-collapse-toggle').addEventListener('change', async (e) => {
     appSettings.autoCollapse = e.target.checked;
+    await saveSettings();
+  });
+
+  // The service worker updates the icon when the setting changes.
+  document.getElementById('badge-select').addEventListener('change', async (e) => {
+    appSettings.badge = e.target.value;
     await saveSettings();
   });
 

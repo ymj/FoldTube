@@ -7,6 +7,7 @@ import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconci
 import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults } from '../lib/oembed.js';
 import { linkToVideo, MENU_FOLD_TAB, MENU_SAVE_LINK, createMenuInstaller } from '../lib/contextmenu.js';
 import { decodeStored, encodeStored, needsMigration, isActive, truncateDescription, SCHEMA_VERSION } from '../lib/archive.js';
+import { badgeMode, badgeCount, badgeText } from '../lib/badge.js';
 
 // ---- Saved videos: single owner ----
 
@@ -84,17 +85,60 @@ async function notify(id, message) {
   } catch (_) { /* notifications are non-critical */ }
 }
 
+// ---- Toolbar badge ----
+
+// The count the user chose in Settings: open YouTube video tabs, videos in
+// the library, or nothing (see lib/badge.js). A short flash after a
+// right-click save takes over for 3 seconds, then the count comes back.
+const BADGE_COLOR = "#5f6368";
+let badgeTimer = null;
+let badgeFlashing = false;
+let badgeRefresh = null;
+
+async function showBadgeCount() {
+  if (badgeFlashing) return;
+  try {
+    const { settings = {} } = await chrome.storage.local.get("settings");
+    const mode = badgeMode(settings);
+    let count = 0;
+    if (mode === "tabs") count = badgeCount(mode, { tabs: await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS }) });
+    if (mode === "library") count = badgeCount(mode, { videos: await readSavedVideos() });
+    if (badgeFlashing) return;
+    await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
+    await chrome.action.setBadgeText({ text: badgeText(count) });
+  } catch (_) { /* the badge is non-critical */ }
+}
+
+// Tab events come in bursts (a fold closes many tabs): update once after.
+function refreshBadge() {
+  clearTimeout(badgeRefresh);
+  badgeRefresh = setTimeout(showBadgeCount, 150);
+}
+
 // A short badge on the toolbar icon: confirmation that shows even when the
 // OS hides notifications.
-let badgeTimer = null;
 function flashBadge(text, color) {
   try {
     clearTimeout(badgeTimer);
+    badgeFlashing = true;
     chrome.action.setBadgeBackgroundColor({ color });
     chrome.action.setBadgeText({ text });
-    badgeTimer = setTimeout(() => chrome.action.setBadgeText({ text: "" }), 3000);
+    badgeTimer = setTimeout(() => { badgeFlashing = false; showBadgeCount(); }, 3000);
   } catch (_) { /* the badge is non-critical */ }
 }
+
+chrome.tabs.onCreated.addListener(refreshBadge);
+chrome.tabs.onRemoved.addListener(refreshBadge);
+chrome.tabs.onReplaced.addListener(refreshBadge);
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+  if (changeInfo.url !== undefined) refreshBadge();
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && (changes.settings || changes.savedVideos)) refreshBadge();
+});
+chrome.runtime.onStartup.addListener(refreshBadge);
+chrome.runtime.onInstalled.addListener(refreshBadge);
+refreshBadge();
 
 // ---- Open YouTube tabs (write-ahead) ----
 
