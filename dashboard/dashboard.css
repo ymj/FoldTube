@@ -1135,6 +1135,41 @@ input:checked+.slider:before {
    History
    ════════════════════════════════════════ */
 
+/* After an import: what was added, what was skipped and why. */
+.import-modal {
+  max-width: 480px;
+}
+
+.import-modal .modal-body p {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.import-skipped-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.import-skipped-list li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 24px 20px;
+}
+
+.import-actions button {
+  padding: 8px 14px;
+}
+
 .history-btn {
   display: inline-flex;
   align-items: center;

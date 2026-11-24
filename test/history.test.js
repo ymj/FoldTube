@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises';
 import { applyVideoOp } from '../lib/store.js';
 import { purgeExpired, daysLeft, tombstone, isActive, isArchived, isBackInLibrary, ARCHIVE_DAYS } from '../lib/archive.js';
 import { historyItems, groupByDay, dayLabel, expiryLabel, matchesSearch } from '../lib/history.js';
-import { sanitizeImportedVideo } from '../lib/youtube.js';
 
 const NOW = new Date('2026-11-24T12:00:00.000Z');
 const ctx = { deviceId: 'device-1', now: NOW };
@@ -104,14 +103,6 @@ describe('the 90-day rule', () => {
     assert.equal(expiryLabel(NaN), '');
   });
 
-  test('importing a backup does not bring back expired history', () => {
-    const incoming = [
-      video('fresh', { state: 'watched', stateChangedAt: daysAgo(5) }),
-      video('stale', { state: 'deleted', stateChangedAt: daysAgo(120) }),
-    ];
-    const { videos } = op([], { type: 'import', videos: incoming });
-    assert.deepEqual(videos.map(v => v.videoId), ['fresh']);
-  });
 });
 
 describe('deleting forever', () => {
@@ -254,12 +245,35 @@ describe('a video back in the library stays in History', () => {
     assert.deepEqual(historyItems(list, '', 'library').map(v => v.videoId), ['l']);
   });
 
-  test('backups keep the note, and only on library videos', () => {
-    const base = { videoId: 'dQw4w9WgXcQ', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'A', videoType: 'video' };
-    const kept = sanitizeImportedVideo({ ...base, state: 'active', archivedAt: daysAgo(2), archivedAs: 'watched' });
-    assert.equal(kept.archivedAs, 'watched');
-    assert.equal(sanitizeImportedVideo({ ...base, state: 'watched', archivedAt: daysAgo(2), archivedAs: 'watched' }).archivedAt, undefined);
-    assert.equal(sanitizeImportedVideo({ ...base, state: 'active', archivedAt: 'x', archivedAs: 'watched' }).archivedAt, undefined);
-    assert.equal(sanitizeImportedVideo({ ...base, state: 'active', archivedAt: daysAgo(2), archivedAs: 'purged' }).archivedAt, undefined);
+  test('undo of an open gives back the earlier History entry', () => {
+    const back = [video('a', { archivedAt: daysAgo(3), archivedAs: 'deleted' })];
+    const archived = op(back, { type: 'archive', videoIds: ['a'], state: 'watched' });
+    assert.deepEqual(archived.result.notes, { a: { archivedAt: daysAgo(3), archivedAs: 'deleted' } });
+    const undone = op(archived.videos, { type: 'unarchive', videoIds: archived.result.changed, notes: archived.result.notes }).videos;
+    assert.equal(undone[0].archivedAt, daysAgo(3));
+    assert.equal(undone[0].archivedAs, 'deleted');
+    const junk = op(archived.videos, { type: 'unarchive', videoIds: ['a'], notes: { a: { archivedAt: 'x', archivedAs: 'watched' } } }).videos;
+    assert.equal(isBackInLibrary(junk[0]), false);
   });
+
+  test('a restored tab moved to History loses its older entry', async () => {
+    const { reconcileRestoredTabs } = await import('../lib/store.js');
+    const back = [video('a', { archivedAt: daysAgo(3), archivedAs: 'deleted', pendingRestoreCheck: true })];
+    const [a] = reconcileRestoredTabs(back, new Set(['a']), ctx).videos;
+    assert.equal(a.state, 'watched');
+    assert.equal(a.archivedAt, undefined);
+    assert.equal(a.archivedAs, undefined);
+  });
+
+  test('a late metadata lookup never writes into a deleted video', async () => {
+    const { patchVideos } = await import('../lib/store.js');
+    const list = [{ videoId: 'a', state: 'purged', stateChangedAt: daysAgo(1) }, video('b', { state: 'watched', stateChangedAt: daysAgo(1) }), video('c')];
+    const patches = new Map(['a', 'b', 'c'].map(id => [id, { title: 'Found', channelName: 'Chan' }]));
+    const { videos, result } = patchVideos(list, patches);
+    assert.equal(result.patched, 1);
+    assert.deepEqual(videos[0], list[0]);
+    assert.equal(videos[1], list[1]);
+    assert.equal(videos[2].title, 'Found');
+  });
+
 });

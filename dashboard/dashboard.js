@@ -156,14 +156,17 @@ function archiveVideos(videoIds, state) {
   return changeVideos({ type: 'archive', videoIds, state });
 }
 
-function unarchiveVideos(videoIds) {
-  return changeVideos({ type: 'unarchive', videoIds });
+// Undo: `archived` is what the archive change returned, so a video that was
+// in History before gets its earlier entry back too.
+function unarchiveVideos(archived) {
+  return changeVideos({ type: 'unarchive', videoIds: archived.changed, notes: archived.notes });
 }
 
 // ---- Undo Toast ----
 function showUndoToast(message, restoreFn) {
   clearTimeout(undoTimer);
   undoStack = restoreFn;
+  document.getElementById('btn-undo').hidden = false;
 
   const toast = document.getElementById('undo-toast');
   document.getElementById('undo-toast-msg').textContent = message;
@@ -407,7 +410,10 @@ function bindControls() {
     if (e.key === 'Escape') {
       if (settingsModal.open) { settingsModal.close(); return; }
       if (helpModal.open) { helpModal.close(); return; }
-      if (historyOpen && document.activeElement.tagName !== 'INPUT') { showHistory(false); return; }
+      // From History, Esc goes back unless it is clearing a search.
+      const active = document.activeElement;
+      const typing = active.tagName === 'INPUT' && !(active.id === 'history-search' && !active.value);
+      if (historyOpen && !typing) { showHistory(false); return; }
     }
     if (historyOpen) return;
     if (e.key === 'Delete' && selectedVideoIds.size > 0 && document.activeElement.tagName !== 'INPUT') {
@@ -481,13 +487,21 @@ function bindControls() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (evt) => {
+      let validItems;
       try {
-        const validItems = validateImport(JSON.parse(evt.target.result));
-        const { added } = await changeVideos({ type: 'import', videos: validItems });
-        settingsModal.close();
-        alert(`Imported ${added} new video${added === 1 ? '' : 's'}!`);
+        validItems = validateImport(JSON.parse(evt.target.result));
       } catch {
         alert("Failed to parse the JSON file. Please check it's a valid FoldTube backup.");
+        e.target.value = '';
+        return;
+      }
+      try {
+        const result = await changeVideos({ type: 'import', videos: validItems });
+        settingsModal.close();
+        showImportResult(result, validItems);
+      } catch (err) {
+        console.error('FoldTube: import failed', err);
+        alert('The backup could not be imported. Please try again.');
       }
       e.target.value = '';
     };
@@ -548,8 +562,8 @@ function bindControls() {
     removed.forEach(v => chrome.tabs.create({ url: openUrlFor(v), active: false }));
     selectedVideoIds.clear();
     updateSelectionBar();
-    const { changed } = await archiveVideos([...ids], 'watched');
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => unarchiveVideos(changed));
+    const result = await archiveVideos([...ids], 'watched');
+    showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => unarchiveVideos(result));
   });
 
   document.getElementById('btn-delete-selected').addEventListener('click', async () => {
@@ -559,11 +573,12 @@ function bindControls() {
     if (count > 1 && !confirm(`Delete ${count} selected videos?`)) return;
     selectedVideoIds.clear();
     updateSelectionBar();
-    const { changed } = await archiveVideos([...ids], 'deleted');
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => unarchiveVideos(changed));
+    const result = await archiveVideos([...ids], 'deleted');
+    showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => unarchiveVideos(result));
   });
 
   bindHistory();
+  bindImportResult();
 }
 
 // ---- Selection bar ----
@@ -806,7 +821,7 @@ async function deleteSingleVideo(video, cardElement) {
   const toastMsg = title
     ? `"${title.length > 40 ? title.slice(0, 40) + '…' : title}" removed`
     : 'Video removed';
-  showUndoToast(toastMsg, async () => unarchiveVideos((await removal).changed));
+  showUndoToast(toastMsg, async () => unarchiveVideos(await removal));
 }
 
 async function openSingleVideo(video, cardElement) {
@@ -814,6 +829,83 @@ async function openSingleVideo(video, cardElement) {
   chrome.tabs.create({ url: openUrlFor(video) });
   cardElement.classList.add('card-exit');
   setTimeout(() => archiveVideos([video.videoId], 'watched'), 300);
+}
+
+// ---- Import result ----
+
+// Says what an import did: how many videos were added, and which were
+// skipped because they were opened or removed here after the backup was
+// made. The skipped ones can be added anyway.
+function showImportResult({ added, skipped = [] }, backup) {
+  const modal = document.getElementById('import-modal');
+  const byId = new Map(backup.map(v => [v.videoId, v]));
+  const videos = (n) => `${n} video${n === 1 ? '' : 's'}`;
+
+  const summary = document.getElementById('import-summary');
+  if (skipped.length) {
+    const them = skipped.length === 1 ? 'it' : 'them';
+    summary.textContent = `${added ? `Added ${videos(added)} to your library.` : 'No videos were added.'} `
+      + `${videos(skipped.length)} ${skipped.length === 1 ? 'was' : 'were'} skipped because you watched or removed ${them} after this backup was made:`;
+  } else {
+    summary.textContent = added
+      ? `Added ${videos(added)} to your library.`
+      : 'Everything in this backup is already in your library.';
+  }
+
+  const list = document.getElementById('import-skipped-list');
+  const shown = skipped.slice(0, 3).map(id => {
+    const li = document.createElement('li');
+    li.textContent = byId.get(id)?.title || id;
+    return li;
+  });
+  if (skipped.length > 3) {
+    const more = document.createElement('li');
+    more.textContent = `and ${skipped.length - 3} more`;
+    shown.push(more);
+  }
+  list.replaceChildren(...shown);
+  document.getElementById('import-question').textContent =
+    `Add ${skipped.length === 1 ? 'it' : `these ${skipped.length}`} to your library too?`;
+
+  const asking = skipped.length > 0;
+  document.getElementById('import-skipped').classList.toggle('hidden', !asking);
+  document.getElementById('btn-import-leave').classList.toggle('hidden', !asking);
+  document.getElementById('btn-import-add').classList.toggle('hidden', !asking);
+  document.getElementById('btn-import-done').classList.toggle('hidden', asking);
+  pendingSkipped = skipped.map(id => byId.get(id)).filter(Boolean);
+  modal.showModal();
+}
+
+let pendingSkipped = [];
+
+function bindImportResult() {
+  const modal = document.getElementById('import-modal');
+  const close = () => { pendingSkipped = []; modal.close(); };
+  document.getElementById('btn-import-leave').addEventListener('click', close);
+  document.getElementById('btn-import-done').addEventListener('click', close);
+  document.getElementById('btn-import-add').addEventListener('click', async () => {
+    const videos = pendingSkipped;
+    close();
+    if (!videos.length) return;
+    // The same as saving them again: back in the library, still listed in
+    // History as back in library.
+    const { added } = await changeVideos({ type: 'add', videos });
+    showMessageToast(`Added ${added} more video${added === 1 ? '' : 's'} to your library.`);
+  });
+}
+
+// A short message in the toast, without Undo.
+function showMessageToast(message) {
+  clearTimeout(undoTimer);
+  undoStack = null;
+  const toast = document.getElementById('undo-toast');
+  document.getElementById('undo-toast-msg').textContent = message;
+  document.getElementById('btn-undo').hidden = true;
+  toast.classList.add('visible');
+  undoTimer = setTimeout(() => {
+    toast.classList.remove('visible');
+    document.getElementById('btn-undo').hidden = false;
+  }, 4000);
 }
 
 // ---- History ----

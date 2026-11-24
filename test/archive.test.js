@@ -205,11 +205,15 @@ describe('backups', () => {
     { ...v1('9bZkp7q5F2w', '2026-11-02T00:00:00Z'), state: 'watched', stateChangedAt: '2026-11-04T00:00:00.000Z', stateChangedBy: 'device-a' },
   ];
 
-  test('JSON export: every record, archived included, with the schema version, no device ID or settings', () => {
-    const backup = buildJsonExport(records);
+  test('JSON export: the library only, with the schema version, no device ID, History notes or settings', () => {
+    const back = { ...v1('kJQP7kiw5Fk', '2026-11-01T00:00:00Z'), state: 'active', stateChangedAt: '2026-11-05T00:00:00.000Z', stateChangedBy: 'device-a', archivedAt: '2026-11-04T00:00:00.000Z', archivedAs: 'watched' };
+    const backup = buildJsonExport([...records, back, { videoId: 'gone', state: 'purged', stateChangedAt: '2026-11-04T00:00:00.000Z' }]);
     assert.equal(backup.schemaVersion, 2);
-    assert.deepEqual(Object.keys(backup.savedVideos), ['dQw4w9WgXcQ', '9bZkp7q5F2w']);
-    assert.equal(backup.deviceId, undefined);
+    assert.deepEqual(Object.keys(backup.savedVideos), ['dQw4w9WgXcQ', 'kJQP7kiw5Fk']);
+    const saved = backup.savedVideos.kJQP7kiw5Fk;
+    assert.equal(saved.stateChangedAt, '2026-11-05T00:00:00.000Z', 'kept, so a newer change wins on import');
+    for (const key of ['stateChangedBy', 'archivedAt', 'archivedAs']) assert.equal(saved[key], undefined, key);
+    assert.doesNotMatch(JSON.stringify(backup), /device-a/);
     assert.equal(backup.settings, undefined);
   });
 
@@ -219,16 +223,23 @@ describe('backups', () => {
     assert.doesNotMatch(html, /9bZkp7q5F2w/);
   });
 
-  test('v2 backups import with their state; v1 backups import as active', () => {
-    const fromV2 = validateImport(JSON.parse(JSON.stringify(buildJsonExport(records))));
-    assert.deepEqual(fromV2.map(v => v.state), ['active', 'watched']);
-    assert.equal(fromV2[1].stateChangedAt, '2026-11-04T00:00:00.000Z');
+  test('everything in a backup imports into the library; only the change date is kept', () => {
+    const fromV2 = validateImport({ schemaVersion: 2, savedVideos: {
+      dQw4w9WgXcQ: { ...records[0], stateChangedBy: 'someone', archivedAt: '2026-11-01T00:00:00Z', archivedAs: 'watched' },
+      '9bZkp7q5F2w': records[1],
+    } });
+    assert.deepEqual(fromV2.map(v => v.state), [undefined, undefined]);
+    assert.equal(fromV2[0].stateChangedAt, '2026-11-03T00:00:00.000Z');
+    assert.equal(fromV2[0].stateChangedBy, undefined);
+    assert.equal(fromV2[0].archivedAt, undefined);
+
+    const { videos, result } = importRecords([], fromV2, ctx);
+    assert.ok(videos.every(isActive));
+    assert.equal(videos[0].stateChangedBy, 'device-a');
+    assert.deepEqual(result, { added: 2, skipped: [] });
 
     const fromV1 = validateImport([v1('dQw4w9WgXcQ', '2026-11-01T00:00:00Z')]);
-    assert.equal(fromV1[0].state, undefined);
-    const { videos } = importRecords([], fromV1, ctx);
-    assert.equal(videos[0].state, 'active');
-    assert.equal(videos[0].stateChangedBy, 'device-a');
+    assert.equal(importRecords([], fromV1, ctx).videos[0].state, 'active');
   });
 
   test('tombstones in a backup are skipped; a backup of only tombstones is not an error', () => {
@@ -240,25 +251,40 @@ describe('backups', () => {
     for (const bad of [null, 42, 'x', { savedVideos: [] }, {}]) assert.throws(() => validateImport(bad), /Invalid format/);
   });
 
-  test('conflicts: the newer change of state wins', () => {
-    const ours = { ...records[0], title: 'ours', stateChangedAt: '2026-11-10T00:00:00.000Z' };
-    const newer = { ...records[0], title: 'theirs', state: 'watched', stateChangedAt: '2026-11-20T00:00:00.000Z' };
-    const older = { ...records[0], title: 'theirs', state: 'deleted', stateChangedAt: '2026-11-01T00:00:00.000Z' };
-
-    const won = importRecords([ours], [newer], later);
-    assert.equal(won.videos[0].title, 'theirs');
-    assert.equal(won.videos[0].state, 'watched');
-    assert.deepEqual(won.result, { added: 0, updated: 1 });
-
-    const lost = importRecords([ours], [older], later);
-    assert.equal(lost.videos[0], ours);
-    assert.deepEqual(lost.result, { added: 0, updated: 0 });
+  test('a video opened or removed here after the backup was made is skipped', () => {
+    const backedUp = { ...records[0], stateChangedAt: '2026-11-03T00:00:00.000Z' };
+    const watchedLater = { ...records[0], title: 'ours', state: 'watched', stateChangedAt: '2026-11-10T00:00:00.000Z' };
+    const gone = { videoId: records[0].videoId, state: 'purged', stateChangedAt: '2026-11-10T00:00:00.000Z' };
+    for (const ours of [watchedLater, gone]) {
+      const { videos, result } = importRecords([ours], [backedUp], later);
+      assert.deepEqual(videos, [ours]);
+      assert.deepEqual(result, { added: 0, skipped: [records[0].videoId] });
+    }
   });
 
-  test('a v1 backup never replaces a video already in the list', () => {
-    const ours = { ...records[1] };
-    const { videos } = importRecords([ours], [{ ...v1('9bZkp7q5F2w', '2026-11-30T00:00:00Z'), title: 'v1' }], later);
-    assert.equal(videos[0], ours);
+  test('a video removed here before the backup was made comes back, still listed in History', () => {
+    const removedEarlier = { ...records[0], state: 'deleted', stateChangedAt: '2026-11-01T00:00:00.000Z' };
+    const { videos, result } = importRecords([removedEarlier], [{ ...records[0], stateChangedAt: '2026-11-03T00:00:00.000Z' }], later);
+    assert.deepEqual(result, { added: 1, skipped: [] });
+    assert.equal(videos[0].state, 'active');
+    assert.equal(videos[0].archivedAs, 'deleted');
+  });
+
+  test('a video already in the library is left alone', () => {
+    const ours = { ...records[0], title: 'ours' };
+    const { videos, result } = importRecords([ours], [{ ...records[0], stateChangedAt: '2026-11-30T00:00:00.000Z' }], later);
+    assert.deepEqual(videos, [ours]);
+    assert.deepEqual(result, { added: 0, skipped: [] });
+  });
+
+  test('skipped videos can be added anyway, like saving them again', () => {
+    const watched = { ...records[0], state: 'watched', stateChangedAt: '2026-11-10T00:00:00.000Z' };
+    const { result } = importRecords([watched], [records[0]], later);
+    const { videos, result: addResult } = applyVideoOp([watched], { type: 'add', videos: [records[0]] }, later);
+    assert.deepEqual(result.skipped, [records[0].videoId]);
+    assert.equal(addResult.added, 1);
+    assert.equal(videos[0].state, 'active');
+    assert.equal(videos[0].archivedAs, 'watched', 'still listed in History, as back in library');
   });
 
   test('the import op goes through applyVideoOp and keeps the list sorted', () => {

@@ -498,7 +498,7 @@ async function runEnrichment() {
 
 // ---- Messages from the dashboard ----
 
-const DASHBOARD_OPS = new Set(['import', 'archive', 'unarchive', 'forget', 'clearHistory', 'purge']);
+const DASHBOARD_OPS = new Set(['add', 'import', 'archive', 'unarchive', 'forget', 'clearHistory', 'purge']);
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Only this extension's own pages may change the library.
