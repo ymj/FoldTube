@@ -121,6 +121,7 @@ async function init() {
         if (historyOpen) renderHistory();
         else processAndRender();
         renderSettingsHistory();
+        renderBackupButtons();
       }
       if (changes.apiError) {
         const banner = document.getElementById('api-error-banner');
@@ -392,6 +393,7 @@ function bindControls() {
   const openSettings = () => {
     selectSettingsTab('general');
     renderSettingsHistory();
+    renderBackupButtons();
     renderShortcuts(document.getElementById('shortcut-list'));
     settingsModal.showModal();
   };
@@ -1044,6 +1046,17 @@ async function clearHistory() {
     : 'Clear History? Videos back in your library stay there.';
   if (!confirm(message)) return;
   await changeVideos({ type: 'clearHistory' });
+}
+
+// Backups hold the library only: nothing to export while it's empty.
+// Import stays available, since that is how an empty library gets filled.
+function renderBackupButtons() {
+  const empty = allVideos.length === 0;
+  for (const id of ['btn-export', 'btn-export-html']) {
+    const button = document.getElementById(id);
+    button.disabled = empty;
+    button.title = empty ? 'Nothing to export yet' : '';
+  }
 }
 
 // The History line in Settings → Advanced.
