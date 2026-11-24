@@ -1135,28 +1135,61 @@ input:checked+.slider:before {
    History
    ════════════════════════════════════════ */
 
-/* After an import: what was added, what was skipped and why. */
+/* After an import: what was added, what was already there, what was
+   skipped and why. */
 .import-modal {
   max-width: 480px;
 }
 
-.import-modal .modal-body p {
-  margin: 0 0 12px;
+.import-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.import-stat {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.import-stat strong {
+  color: var(--text-primary);
+}
+
+.import-skipped {
+  margin-top: 20px;
+}
+
+.import-skipped p {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
   line-height: 1.5;
 }
 
-.import-skipped-list {
-  margin: 0 0 12px;
-  padding-left: 20px;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.6;
+.import-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.import-skipped-list li {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.import-thumbs img,
+.import-thumbs .more {
+  width: 72px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--skeleton-base);
+}
+
+.import-thumbs .more {
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .import-actions {
@@ -1167,7 +1200,7 @@ input:checked+.slider:before {
 }
 
 .import-actions button {
-  padding: 8px 14px;
+  padding: 8px 16px;
 }
 
 .history-btn {

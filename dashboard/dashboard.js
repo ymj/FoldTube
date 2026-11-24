@@ -833,47 +833,46 @@ async function openSingleVideo(video, cardElement) {
 
 // ---- Import result ----
 
-// Says what an import did: how many videos were added, and which were
-// skipped because they were opened or removed here after the backup was
-// made. The skipped ones can be added anyway.
-function showImportResult({ added, skipped = [] }, backup) {
-  const modal = document.getElementById('import-modal');
+// Says what an import did: how many videos were added, how many were
+// already in the library, and which were skipped because they were opened
+// or removed here after the backup was made. Those can be restored.
+function showImportResult({ added, inLibrary = 0, skipped = [] }, backup) {
   const byId = new Map(backup.map(v => [v.videoId, v]));
-  const videos = (n) => `${n} video${n === 1 ? '' : 's'}`;
+  const total = backup.length;
+  document.getElementById('import-title').textContent =
+    `${total} video${total === 1 ? '' : 's'} in this backup`;
+  document.getElementById('import-added').textContent = added;
+  document.getElementById('import-in-library').textContent = inLibrary;
+  document.getElementById('import-skipped-count').textContent = skipped.length;
+  document.getElementById('import-stat-skipped').classList.toggle('hidden', skipped.length === 0);
 
-  const summary = document.getElementById('import-summary');
-  if (skipped.length) {
-    const them = skipped.length === 1 ? 'it' : 'them';
-    summary.textContent = `${added ? `Added ${videos(added)} to your library.` : 'No videos were added.'} `
-      + `${videos(skipped.length)} ${skipped.length === 1 ? 'was' : 'were'} skipped because you watched or removed ${them} after this backup was made:`;
-  } else {
-    summary.textContent = added
-      ? `Added ${videos(added)} to your library.`
-      : 'Everything in this backup is already in your library.';
-  }
-
-  const list = document.getElementById('import-skipped-list');
-  const shown = skipped.slice(0, 3).map(id => {
-    const li = document.createElement('li');
-    li.textContent = byId.get(id)?.title || id;
-    return li;
+  // Thumbnails rather than titles: easy to tell apart, any length, any
+  // language. The title shows on hover.
+  const SHOWN = 5;
+  const thumbs = skipped.slice(0, SHOWN).map(id => {
+    const img = document.createElement('img');
+    img.src = thumbnailUrlFor(id, 'mqdefault');
+    img.alt = byId.get(id)?.title || '';
+    img.title = byId.get(id)?.title || '';
+    return img;
   });
-  if (skipped.length > 3) {
-    const more = document.createElement('li');
-    more.textContent = `and ${skipped.length - 3} more`;
-    shown.push(more);
+  if (skipped.length > SHOWN) {
+    const more = document.createElement('span');
+    more.className = 'more';
+    more.textContent = `+${skipped.length - SHOWN}`;
+    more.title = skipped.slice(SHOWN).map(id => byId.get(id)?.title || id).join('\n');
+    thumbs.push(more);
   }
-  list.replaceChildren(...shown);
-  document.getElementById('import-question').textContent =
-    `Add ${skipped.length === 1 ? 'it' : `these ${skipped.length}`} to your library too?`;
+  document.getElementById('import-thumbs').replaceChildren(...thumbs);
 
   const asking = skipped.length > 0;
   document.getElementById('import-skipped').classList.toggle('hidden', !asking);
-  document.getElementById('btn-import-leave').classList.toggle('hidden', !asking);
-  document.getElementById('btn-import-add').classList.toggle('hidden', !asking);
-  document.getElementById('btn-import-done').classList.toggle('hidden', asking);
+  const restore = document.getElementById('btn-import-add');
+  restore.classList.toggle('hidden', !asking);
+  restore.textContent = `Restore ${skipped.length}`;
   pendingSkipped = skipped.map(id => byId.get(id)).filter(Boolean);
-  modal.showModal();
+  document.getElementById('import-modal').showModal();
+  (asking ? restore : document.getElementById('btn-import-done')).focus();
 }
 
 let pendingSkipped = [];
@@ -881,7 +880,6 @@ let pendingSkipped = [];
 function bindImportResult() {
   const modal = document.getElementById('import-modal');
   const close = () => { pendingSkipped = []; modal.close(); };
-  document.getElementById('btn-import-leave').addEventListener('click', close);
   document.getElementById('btn-import-done').addEventListener('click', close);
   document.getElementById('btn-import-add').addEventListener('click', async () => {
     const videos = pendingSkipped;
@@ -890,7 +888,7 @@ function bindImportResult() {
     // The same as saving them again: back in the library, still listed in
     // History as back in library.
     const { added } = await changeVideos({ type: 'add', videos });
-    showMessageToast(`Added ${added} more video${added === 1 ? '' : 's'} to your library.`);
+    showMessageToast(`Restored ${added} video${added === 1 ? '' : 's'} to your library.`);
   });
 }
 

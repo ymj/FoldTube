@@ -217,6 +217,16 @@ describe('backups', () => {
     assert.equal(backup.settings, undefined);
   });
 
+  test('a backup holds nothing but the library: no settings, no API key', async () => {
+    const backup = buildJsonExport(records);
+    assert.deepEqual(Object.keys(backup), ['schemaVersion', 'savedVideos']);
+    // The dashboard exports exactly this, from the saved list alone.
+    const { readFile } = await import('node:fs/promises');
+    const src = await readFile(new URL('../dashboard/dashboard.js', import.meta.url), 'utf8');
+    assert.match(src, /JSON\.stringify\(buildJsonExport\(allRecords\)/);
+    assert.doesNotMatch(src, /buildJsonExport\([^)]*(appSettings|apiKey|settings)/);
+  });
+
   test('HTML export: the library only', () => {
     const html = buildHtmlExport(records, { date: 'd', exportedAt: 'e' });
     assert.match(html, /dQw4w9WgXcQ/);
@@ -236,7 +246,7 @@ describe('backups', () => {
     const { videos, result } = importRecords([], fromV2, ctx);
     assert.ok(videos.every(isActive));
     assert.equal(videos[0].stateChangedBy, 'device-a');
-    assert.deepEqual(result, { added: 2, skipped: [] });
+    assert.deepEqual(result, { added: 2, inLibrary: 0, skipped: [] });
 
     const fromV1 = validateImport([v1('dQw4w9WgXcQ', '2026-11-01T00:00:00Z')]);
     assert.equal(importRecords([], fromV1, ctx).videos[0].state, 'active');
@@ -258,14 +268,14 @@ describe('backups', () => {
     for (const ours of [watchedLater, gone]) {
       const { videos, result } = importRecords([ours], [backedUp], later);
       assert.deepEqual(videos, [ours]);
-      assert.deepEqual(result, { added: 0, skipped: [records[0].videoId] });
+      assert.deepEqual(result, { added: 0, inLibrary: 0, skipped: [records[0].videoId] });
     }
   });
 
   test('a video removed here before the backup was made comes back, still listed in History', () => {
     const removedEarlier = { ...records[0], state: 'deleted', stateChangedAt: '2026-11-01T00:00:00.000Z' };
     const { videos, result } = importRecords([removedEarlier], [{ ...records[0], stateChangedAt: '2026-11-03T00:00:00.000Z' }], later);
-    assert.deepEqual(result, { added: 1, skipped: [] });
+    assert.deepEqual(result, { added: 1, inLibrary: 0, skipped: [] });
     assert.equal(videos[0].state, 'active');
     assert.equal(videos[0].archivedAs, 'deleted');
   });
@@ -274,7 +284,7 @@ describe('backups', () => {
     const ours = { ...records[0], title: 'ours' };
     const { videos, result } = importRecords([ours], [{ ...records[0], stateChangedAt: '2026-11-30T00:00:00.000Z' }], later);
     assert.deepEqual(videos, [ours]);
-    assert.deepEqual(result, { added: 0, skipped: [] });
+    assert.deepEqual(result, { added: 0, inLibrary: 1, skipped: [] });
   });
 
   test('skipped videos can be added anyway, like saving them again', () => {
