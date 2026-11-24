@@ -1239,6 +1239,11 @@ input:checked+.slider:before {
   opacity: 0.65;
 }
 
+.setting-group p.history-count {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 .history-note {
   margin: 10px 0 0;
   font-size: 0.85rem;

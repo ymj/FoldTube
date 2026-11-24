@@ -898,9 +898,9 @@ async function clearHistory() {
 // The History line in Settings → Advanced.
 function renderSettingsHistory() {
   const count = historyItems(allRecords).length;
-  document.getElementById('settings-history-note').textContent = count
-    ? `${count} video${count === 1 ? '' : 's'} in History. Videos you open or remove stay there for 90 days.`
-    : 'History is empty. Videos you open or remove stay there for 90 days.';
+  document.getElementById('settings-history-count').textContent = count
+    ? `${count} video${count === 1 ? '' : 's'} saved`
+    : 'No videos saved';
   document.getElementById('btn-settings-clear-history').disabled = count === 0;
 }
 
