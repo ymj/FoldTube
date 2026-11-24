@@ -1,7 +1,8 @@
 import {
   validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor, YOUTUBE_TAB_PATTERNS, countFoldableTabs,
-  resumeSeconds, openUrlFor, formatDuration,
+  resumeSeconds, openUrlFor, formatDuration, buildJsonExport,
 } from '../lib/youtube.js';
+import { decodeStored, isActive } from '../lib/archive.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 
 let allVideos = [];
@@ -105,7 +106,7 @@ async function init() {
     if (area === "local") {
       if (changes.hasSavedBefore) hasSavedBefore = Boolean(changes.hasSavedBefore.newValue);
       if (changes.savedVideos) {
-        allVideos = changes.savedVideos.newValue || [];
+        setRecords(changes.savedVideos.newValue);
         const currentIds = new Set(allVideos.map(v => v.videoId));
         for (const id of selectedVideoIds) {
           if (!currentIds.has(id)) selectedVideoIds.delete(id);
@@ -451,7 +452,7 @@ function bindControls() {
 
   // Export JSON
   document.getElementById('btn-export').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(allVideos, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(buildJsonExport(allRecords), null, 2)], { type: "application/json" });
     triggerDownload(blob, `foldtube_backup_${today()}.json`);
   });
 
@@ -472,7 +473,7 @@ function bindControls() {
     reader.onload = async (evt) => {
       try {
         const validItems = validateImport(JSON.parse(evt.target.result));
-        const { added } = await changeVideos({ type: 'add', videos: validItems });
+        const { added } = await changeVideos({ type: 'import', videos: validItems });
         settingsModal.close();
         alert(`Imported ${added} new video${added === 1 ? '' : 's'}!`);
       } catch {
@@ -562,10 +563,19 @@ function updateSelectionBar() {
 }
 
 // ---- Load & Render ----
+
+// Every record, archived ones included (for the backup), and the library:
+// the active ones, which is what the grid, search and filters show.
+let allRecords = [];
+function setRecords(stored) {
+  allRecords = decodeStored(stored);
+  allVideos = allRecords.filter(isActive);
+}
+
 async function loadVideos() {
   try {
-    const { savedVideos = [], hasSavedBefore: savedBefore } = await chrome.storage.local.get(["savedVideos", "hasSavedBefore"]);
-    allVideos = savedVideos;
+    const { savedVideos, hasSavedBefore: savedBefore } = await chrome.storage.local.get(["savedVideos", "hasSavedBefore"]);
+    setRecords(savedVideos);
     hasSavedBefore = Boolean(savedBefore);
     // Libraries from before this flag existed: having videos now counts.
     if (allVideos.length && !hasSavedBefore) {

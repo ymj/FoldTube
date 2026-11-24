@@ -6,18 +6,67 @@ import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recov
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
 import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults } from '../lib/oembed.js';
 import { menuItems, linkToVideo, MENU_FOLD_TAB, MENU_SAVE_LINK } from '../lib/contextmenu.js';
+import { decodeStored, encodeStored, needsMigration, isActive, truncateDescription, SCHEMA_VERSION } from '../lib/archive.js';
 
 // ---- Saved videos: single owner ----
 
+// A random ID for this install, made once. It marks which install changed a
+// video's state, so lists from two devices can be merged later. It encodes
+// nothing about the browser or the user.
+let deviceIdPromise = null;
+function getDeviceId() {
+  deviceIdPromise ??= (async () => {
+    const { deviceId } = await chrome.storage.local.get("deviceId");
+    if (typeof deviceId === "string" && deviceId) return deviceId;
+    const id = crypto.randomUUID();
+    await chrome.storage.local.set({ deviceId: id });
+    return id;
+  })();
+  return deviceIdPromise;
+}
+
+async function changeContext() {
+  return { deviceId: await getDeviceId(), now: new Date() };
+}
+
 // Every change to savedVideos goes through mutateSavedVideos, one at a time,
-// applied to the array as stored *now* (see lib/store.js). This is the only
-// place that writes it.
+// applied to the list as stored *now* (see lib/store.js). This is the only
+// place that writes it. Stored as a map keyed by video ID (lib/archive.js);
+// handled here as an array, newest saved first.
 const mutateSavedVideos = createVideoStore({
-  read: async () => (await chrome.storage.local.get("savedVideos")).savedVideos || [],
+  read: async () => decodeStored((await chrome.storage.local.get("savedVideos")).savedVideos, await changeContext()),
   // hasSavedBefore tells the dashboard's empty view apart: first run vs
   // everything watched or removed.
-  write: (videos) => chrome.storage.local.set({ savedVideos: videos, ...(videos.length ? { hasSavedBefore: true } : {}) }),
+  write: (videos) => chrome.storage.local.set({
+    savedVideos: encodeStored(videos),
+    schemaVersion: SCHEMA_VERSION,
+    ...(videos.length ? { hasSavedBefore: true } : {}),
+  }),
 });
+
+// Apply one operation from lib/store.js, stamped with this install and time.
+async function applyOp(op) {
+  const ctx = await changeContext();
+  return mutateSavedVideos(videos => applyVideoOp(videos, op, ctx));
+}
+
+// The saved list, read without changing it.
+async function readSavedVideos() {
+  return decodeStored((await chrome.storage.local.get("savedVideos")).savedVideos);
+}
+
+// Lists saved by 1.0.8 and earlier are an array. Convert once, in one write:
+// reading converts, and writing stores the new shape. Safe to run again.
+async function migrateStorage() {
+  const stored = await chrome.storage.local.get(["savedVideos", "schemaVersion"]);
+  if (!needsMigration(stored)) return;
+  await mutateSavedVideos(videos => ({ videos: [...videos] }));
+  console.log("FoldTube: saved list converted to the new format.");
+}
+
+const migrated = migrateStorage().catch(e => console.error("FoldTube: converting the saved list failed", e));
+chrome.runtime.onInstalled.addListener(() => migrated.then(migrateStorage));
+chrome.runtime.onStartup.addListener(() => migrated.then(migrateStorage));
 
 // ---- Shared helpers ----
 
@@ -75,6 +124,7 @@ const SESSION_FLAG = "foldtubeSessionStarted";
 // A new session: save what the last one left open and didn't get back, drop
 // duplicates of restored tabs, then list the tabs open now.
 const sessionReady = enqueueSnapshot(async () => {
+  await migrated;
   if ((await chrome.storage.session.get(SESSION_FLAG))[SESSION_FLAG]) return;
 
   const tabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
@@ -83,7 +133,7 @@ const sessionReady = enqueueSnapshot(async () => {
 
   const recovered = recoverClosedTabs(await readTabSnapshot(), openIds, settings);
   if (recovered.length) {
-    const { added } = await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: recovered }));
+    const { added } = await applyOp({ type: 'add', videos: recovered });
     console.log(`FoldTube: saved ${added} tab(s) left open when the browser last closed.`);
     fillInMetadata();
   }
@@ -120,7 +170,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
       const { settings = {} } = await chrome.storage.local.get("settings");
       const video = autoCollapseVideo(removeInfo, settings, entry);
       if (video) {
-        await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
+        await applyOp({ type: 'add', videos: [video] });
         fillInMetadata();
       }
     }
@@ -142,6 +192,7 @@ async function scrapeTab(tab) {
   });
   const metadata = results[0]?.result;
   if (!metadata) return null;
+  metadata.description = truncateDescription(metadata.description);
   let player = null;
   try {
     const playerResults = await chrome.scripting.executeScript({
@@ -183,7 +234,7 @@ async function scrapeTab(tab) {
 
 // Save folded videos newest first, after any other change in progress.
 function saveFoldedVideos(videos) {
-  return mutateSavedVideos(current => applyVideoOp(current, { type: 'add', videos }));
+  return applyOp({ type: 'add', videos });
 }
 
 // Save first, then close only the tabs that were saved (see lib/fold.js).
@@ -284,7 +335,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 async function saveLink(info, tab) {
   const video = linkToVideo(info.linkUrl);
   if (!video) return;
-  const { added } = await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
+  const { added } = await applyOp({ type: 'add', videos: [video] });
   if (added) fillInMetadata();
 
   // Confirm on the page itself, where the user is looking. Pages the
@@ -349,8 +400,7 @@ function fillInMetadata() {
 // time and carry no cookies. Offline, rate-limited or a server error: stop
 // and try again on a later run.
 async function runChannelLookup() {
-  const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
-  const ids = videoIdsForLookup(savedVideos);
+  const ids = videoIdsForLookup((await readSavedVideos()).filter(isActive));
   let results = new Map();
   const flush = async () => {
     if (!results.size) return;
@@ -387,7 +437,7 @@ async function runEnrichment() {
 
   // Read once to choose what to look up; the results are applied to the list
   // as it is when each batch returns, so changes made meanwhile survive.
-  const { savedVideos = [] } = await chrome.storage.local.get("savedVideos");
+  const savedVideos = (await readSavedVideos()).filter(isActive);
 
   const needsEnrichment = savedVideos.filter(v => 
     v.durationSeconds === 0 || 
@@ -441,7 +491,7 @@ async function runEnrichment() {
 
 // ---- Messages from the dashboard ----
 
-const DASHBOARD_OPS = new Set(['add', 'remove', 'restore']);
+const DASHBOARD_OPS = new Set(['import', 'remove', 'restore']);
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Only this extension's own pages may change the library.
@@ -463,7 +513,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "mutateVideos" && DASHBOARD_OPS.has(request.op?.type)) {
-    mutateSavedVideos(videos => applyVideoOp(videos, request.op))
+    applyOp(request.op)
       .then(result => sendResponse({ ok: true, result }))
       .catch(e => sendResponse({ ok: false, error: String(e?.message || e) }));
     return true; // respond asynchronously
