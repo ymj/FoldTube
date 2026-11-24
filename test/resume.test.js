@@ -37,23 +37,24 @@ describe('reading t from a URL', () => {
 
 describe('position from the player at fold time', () => {
   const video = { url: WATCH, videoType: 'video' };
+  const at = (seconds, source) => ({ seconds, source });
 
   test('floored to whole seconds', () => {
-    assert.equal(positionFromPlayer(video, { position: 754.9 }), 754);
-    assert.equal(positionFromPlayer(video, { position: 0 }), 0);
+    assert.deepEqual(positionFromPlayer(video, { position: 754.9 }), at(754, 'player'));
+    assert.deepEqual(positionFromPlayer(video, { position: 0 }), at(0, 'player'));
   });
 
   test('Shorts and live streams store 0', () => {
-    assert.equal(positionFromPlayer({ url: 'https://www.youtube.com/shorts/abc', videoType: 'short' }, { position: 40 }), 0);
-    assert.equal(positionFromPlayer(video, { position: 900, isLive: true }), 0);
+    assert.equal(positionFromPlayer({ url: 'https://www.youtube.com/shorts/abc', videoType: 'short' }, { position: 40 }).seconds, 0);
+    assert.equal(positionFromPlayer(video, { position: 900, isLive: true }).seconds, 0);
   });
 
   test('during an ad, or with no player, the URL is used', () => {
     const withT = { url: `${WATCH}&t=300`, videoType: 'video' };
-    assert.equal(positionFromPlayer(withT, { position: 12, adShowing: true }), 300);
-    assert.equal(positionFromPlayer(withT, null), 300);
-    assert.equal(positionFromPlayer(withT, { position: null }), 300);
-    assert.equal(positionFromPlayer(video, null), 0);
+    assert.deepEqual(positionFromPlayer(withT, { position: 12, adShowing: true }), at(300, 'url'));
+    assert.deepEqual(positionFromPlayer(withT, null), at(300, 'url'));
+    assert.deepEqual(positionFromPlayer(withT, { position: null }), at(300, 'url'));
+    assert.deepEqual(positionFromPlayer(video, { position: 5, adShowing: true }), at(0, 'url'));
   });
 });
 
@@ -88,32 +89,37 @@ describe('where a saved video opens', () => {
 });
 
 describe('folding a video that is already saved', () => {
-  const saved = (t) => ({ videoId: 'a', url: WATCH, videoType: 'video', timestampSeconds: t, metadataSource: 'scrape' });
+  const saved = (t) => ({ videoId: 'a', url: WATCH, videoType: 'video', timestampSeconds: t, positionSource: 'player' });
+  const folded = (t, source, url = WATCH) => ({ videoId: 'a', url, videoType: 'video', timestampSeconds: t, positionSource: source, metadataSource: 'scrape' });
 
   test('a newer position read from the player replaces the saved one, in place', () => {
     const videos = [{ videoId: 'x' }, saved(100)];
-    const { videos: after, result } = applyVideoOp(videos, { type: 'add', videos: [saved(900)] });
+    const { videos: after, result } = applyVideoOp(videos, { type: 'add', videos: [folded(900, 'player')] });
     assert.equal(result.added, 0);
     assert.deepEqual(after.map(v => v.videoId), ['x', 'a']);
     assert.equal(after[1].timestampSeconds, 900);
   });
 
-  test('watched again from the start: the player says 0, and that is kept', () => {
-    const { videos } = applyVideoOp([saved(900)], { type: 'add', videos: [saved(10)] });
-    assert.equal(videos[0].timestampSeconds, 10);
+  test('rewound before folding: the earlier position wins, even under a minute', () => {
+    assert.equal(applyVideoOp([saved(754)], { type: 'add', videos: [folded(190, 'player')] }).videos[0].timestampSeconds, 190);
+    assert.equal(applyVideoOp([saved(754)], { type: 'add', videos: [folded(10, 'player')] }).videos[0].timestampSeconds, 10);
   });
 
-  test('a URL with no position, or a link save, keeps the saved position', () => {
-    const videos = [saved(900)];
-    const urlOnly = { ...urlToVideoData(WATCH, 'A'), videoId: 'a' };
-    const { videos: after } = applyVideoOp(videos, { type: 'add', videos: [urlOnly] });
+  test('folded during an ad, no t in the URL: the saved position is kept', () => {
+    const videos = [saved(754)];
+    const { videos: after } = applyVideoOp(videos, { type: 'add', videos: [folded(0, 'url')] });
     assert.equal(after, videos, 'nothing written');
   });
 
-  test('a URL with t does update it', () => {
-    const urlWithT = { ...urlToVideoData(`${WATCH}&t=300`, 'A'), videoId: 'a' };
-    const { videos } = applyVideoOp([saved(900)], { type: 'add', videos: [urlWithT] });
+  test('folded during an ad, with t in the URL: the URL position is used', () => {
+    const { videos } = applyVideoOp([saved(900)], { type: 'add', videos: [folded(300, 'url', `${WATCH}&t=300s`)] });
     assert.equal(videos[0].timestampSeconds, 300);
+  });
+
+  test('a sleeping tab or link save with no t keeps the saved position', () => {
+    const videos = [saved(900)];
+    const urlOnly = { ...urlToVideoData(WATCH, 'A'), videoId: 'a' };
+    assert.equal(applyVideoOp(videos, { type: 'add', videos: [urlOnly] }).videos, videos);
   });
 });
 

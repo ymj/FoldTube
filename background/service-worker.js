@@ -175,7 +175,9 @@ async function scrapeTab(tab) {
       metadata.durationFormatted = formatDuration(realDuration);
     }
   } catch (_) { /* the player read is best-effort */ }
-  metadata.timestampSeconds = positionFromPlayer(metadata, player);
+  const { seconds, source } = positionFromPlayer(metadata, player);
+  metadata.timestampSeconds = seconds;
+  metadata.positionSource = source;
   return metadata;
 }
 
