@@ -1169,16 +1169,17 @@ input:checked+.slider:before {
   line-height: 1.5;
 }
 
+/* One row: up to five thumbnails and a "+N" tile, sharing the width. */
 .import-thumbs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
 }
 
 .import-thumbs img,
 .import-thumbs .more {
-  width: 72px;
-  height: 40px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   border-radius: 6px;
   object-fit: cover;
   background: var(--skeleton-base);

@@ -264,12 +264,30 @@ describe('backups', () => {
   test('a video opened or removed here after the backup was made is skipped', () => {
     const backedUp = { ...records[0], stateChangedAt: '2026-11-03T00:00:00.000Z' };
     const watchedLater = { ...records[0], title: 'ours', state: 'watched', stateChangedAt: '2026-11-10T00:00:00.000Z' };
+    const { videos, result } = importRecords([watchedLater], [backedUp], later);
+    assert.deepEqual(videos, [watchedLater]);
+    assert.deepEqual(result, { added: 0, inLibrary: 0, skipped: [records[0].videoId] });
+  });
+
+  test('a video deleted forever here, even after the backup, comes back', () => {
     const gone = { videoId: records[0].videoId, state: 'purged', stateChangedAt: '2026-11-10T00:00:00.000Z' };
-    for (const ours of [watchedLater, gone]) {
-      const { videos, result } = importRecords([ours], [backedUp], later);
-      assert.deepEqual(videos, [ours]);
-      assert.deepEqual(result, { added: 0, inLibrary: 0, skipped: [records[0].videoId] });
-    }
+    const { videos, result } = importRecords([gone], [{ ...records[0], stateChangedAt: '2026-11-03T00:00:00.000Z' }], later);
+    assert.deepEqual(result, { added: 1, inLibrary: 0, skipped: [] });
+    assert.equal(videos.length, 1);
+    assert.equal(videos[0].state, 'active');
+    assert.equal(videos[0].title, records[0].title);
+    assert.equal(videos[0].archivedAt, undefined, 'not listed in History');
+  });
+
+  test('everything removed, history cleared, backup imported: all of it comes back', () => {
+    const backup = [records[0], { ...records[1], state: 'active' }];
+    let list = importRecords([], backup, ctx).videos;
+    list = applyVideoOp(list, { type: 'archive', videoIds: list.map(v => v.videoId), state: 'deleted' }, later).videos;
+    list = applyVideoOp(list, { type: 'clearHistory' }, later).videos;
+    assert.ok(list.every(v => v.state === 'purged'));
+    const { videos, result } = importRecords(list, backup, later);
+    assert.deepEqual(result, { added: 2, inLibrary: 0, skipped: [] });
+    assert.ok(videos.every(isActive));
   });
 
   test('a video removed here before the backup was made comes back, still listed in History', () => {
