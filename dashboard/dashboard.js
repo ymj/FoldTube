@@ -834,33 +834,74 @@ async function openSingleVideo(video, cardElement) {
 // ---- Import result ----
 
 // Says what an import did: how many videos were added, how many were
-// already in the library, and which were skipped because they were opened
-// or removed here after the backup was made. Those can be restored.
+// already in the library, and which were skipped because they are in
+// History (opened or removed here after the backup was made). Those can be
+// restored.
 function showImportResult({ added, inLibrary = 0, skipped = [] }, backup) {
   const byId = new Map(backup.map(v => [v.videoId, v]));
-  const total = backup.length;
-  document.getElementById('import-title').textContent =
-    `${total} video${total === 1 ? '' : 's'} in this backup`;
-  document.getElementById('import-added').textContent = added;
-  document.getElementById('import-in-library').textContent = inLibrary;
-  document.getElementById('import-skipped-count').textContent = skipped.length;
-  document.getElementById('import-stat-skipped').classList.toggle('hidden', skipped.length === 0);
+  const videos = (n) => `${n} video${n === 1 ? '' : 's'}`;
+  const title = document.getElementById('import-title');
+  const detail = document.getElementById('import-detail');
+
+  if (skipped.length) {
+    title.textContent = added ? `${videos(added)} imported` : 'No new videos added';
+    const parts = [];
+    if (inLibrary) parts.push(document.createTextNode(`${inLibrary} already in library`));
+    const inHistory = document.createElement('span');
+    inHistory.className = 'count';
+    const n = document.createElement('strong');
+    n.textContent = skipped.length;
+    inHistory.append(n, ' in history');
+    parts.push(inHistory);
+    detail.replaceChildren(...parts.flatMap((p, i) => (i ? [' · ', p] : [p])));
+    detail.classList.remove('lead');
+  } else if (added && !inLibrary) {
+    title.textContent = `${videos(added)} imported`;
+    detail.textContent = added === 1
+      ? 'The video from this backup was added to your library.'
+      : `All ${added} videos from this backup were added to your library.`;
+    detail.classList.add('lead');
+  } else if (added) {
+    title.textContent = `${videos(added)} imported`;
+    detail.textContent = `${inLibrary} already in library`;
+    detail.classList.remove('lead');
+  } else {
+    title.textContent = 'Library is already up to date';
+    detail.textContent = inLibrary === 1
+      ? 'The video in this backup is already in your library.'
+      : `All ${inLibrary} videos in this backup are already in your library.`;
+    detail.classList.add('lead');
+  }
+
+  document.getElementById('import-skipped-why').textContent = skipped.length === 1
+    ? 'This one was watched or removed after the backup was made:'
+    : `These ${skipped.length} were watched or removed after the backup was made:`;
 
   // Thumbnails rather than titles: easy to tell apart, any length, any
-  // language. The title shows on hover.
+  // language. The title shows on hover or keyboard focus.
   const SHOWN = 5;
+  const titleOf = (id) => byId.get(id)?.title || 'Untitled video';
   const thumbs = skipped.slice(0, SHOWN).map(id => {
+    const wrap = document.createElement('span');
+    wrap.className = 'import-thumb';
+    wrap.tabIndex = 0;
+    wrap.dataset.title = titleOf(id);
     const img = document.createElement('img');
     img.src = thumbnailUrlFor(id, 'mqdefault');
-    img.alt = byId.get(id)?.title || '';
-    img.title = byId.get(id)?.title || '';
-    return img;
+    img.alt = titleOf(id);
+    wrap.appendChild(img);
+    return wrap;
   });
   if (skipped.length > SHOWN) {
+    const rest = skipped.slice(SHOWN);
     const more = document.createElement('span');
-    more.className = 'more';
-    more.textContent = `+${skipped.length - SHOWN}`;
-    more.title = skipped.slice(SHOWN).map(id => byId.get(id)?.title || id).join('\n');
+    more.className = 'import-thumb more';
+    more.tabIndex = 0;
+    more.textContent = `+${rest.length}`;
+    const listed = rest.slice(0, 5).map(titleOf);
+    if (rest.length > 5) listed.push(`and ${rest.length - 5} more`);
+    more.dataset.title = listed.join('\n');
+    more.setAttribute('aria-label', `${rest.length} more: ${listed.join(', ')}`);
     thumbs.push(more);
   }
   document.getElementById('import-thumbs').replaceChildren(...thumbs);
@@ -872,7 +913,7 @@ function showImportResult({ added, inLibrary = 0, skipped = [] }, backup) {
   restore.textContent = `Restore ${skipped.length}`;
   pendingSkipped = skipped.map(id => byId.get(id)).filter(Boolean);
   document.getElementById('import-modal').showModal();
-  (asking ? restore : document.getElementById('btn-import-done')).focus();
+  document.getElementById('btn-import-done').focus();
 }
 
 let pendingSkipped = [];

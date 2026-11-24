@@ -1135,37 +1135,44 @@ input:checked+.slider:before {
    History
    ════════════════════════════════════════ */
 
-/* After an import: what was added, what was already there, what was
-   skipped and why. */
+/* After an import: what was added, what was already there, and what was
+   skipped because it is in History. */
 .import-modal {
   max-width: 480px;
 }
 
-.import-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.import-body {
+  padding: 24px 24px 20px;
 }
 
-.import-stat {
-  padding: 5px 12px;
+.import-body h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.import-detail {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.import-detail.lead {
+  color: var(--text-primary);
+}
+
+.import-detail .count {
+  padding: 1px 8px;
   border-radius: 999px;
   background: var(--surface-hover);
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
-
-.import-stat strong {
   color: var(--text-primary);
 }
 
 .import-skipped {
-  margin-top: 20px;
+  margin-top: 18px;
 }
 
 .import-skipped p {
   margin: 0 0 10px;
-  font-size: 0.9rem;
   line-height: 1.5;
 }
 
@@ -1176,8 +1183,16 @@ input:checked+.slider:before {
   gap: 8px;
 }
 
-.import-thumbs img,
-.import-thumbs .more {
+.import-thumb {
+  position: relative;
+  display: block;
+  border-radius: 6px;
+  outline-offset: 2px;
+}
+
+.import-thumb img,
+.import-thumb.more {
+  display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 6px;
@@ -1185,7 +1200,7 @@ input:checked+.slider:before {
   background: var(--skeleton-base);
 }
 
-.import-thumbs .more {
+.import-thumb.more {
   display: grid;
   place-items: center;
   color: var(--text-secondary);
@@ -1193,11 +1208,53 @@ input:checked+.slider:before {
   font-weight: 600;
 }
 
+/* The title, on hover or keyboard focus. Edge thumbnails line up with
+   their own edge so the tip stays inside the dialog. */
+.import-thumb::after {
+  content: attr(data-title);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--text-primary);
+  color: var(--bg-color);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: pre-line;
+  text-align: start;
+  unicode-bidi: plaintext;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 1;
+}
+
+.import-thumb:nth-child(-n+2)::after {
+  left: 0;
+  transform: none;
+}
+
+.import-thumb:nth-last-child(-n+2)::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.import-thumb:hover::after,
+.import-thumb:focus-visible::after {
+  opacity: 1;
+}
+
 .import-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 0 24px 20px;
+  margin-top: 24px;
 }
 
 .import-actions button {

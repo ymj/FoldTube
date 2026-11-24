@@ -266,25 +266,17 @@
     </div>
   </dialog>
 
-  <dialog id="import-modal" class="modal import-modal" aria-labelledby="import-title">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 id="import-title"></h2>
-      </div>
-      <div class="modal-body">
-        <div class="import-stats">
-          <span class="import-stat"><strong id="import-added"></strong> added</span>
-          <span class="import-stat"><strong id="import-in-library"></strong> in library</span>
-          <span id="import-stat-skipped" class="import-stat skipped"><strong id="import-skipped-count"></strong> skipped</span>
-        </div>
-        <div id="import-skipped" class="import-skipped hidden">
-          <p>You watched or removed these after the backup was made, so they weren't added.</p>
-          <div id="import-thumbs" class="import-thumbs"></div>
-        </div>
+  <dialog id="import-modal" class="modal import-modal" aria-labelledby="import-title" aria-describedby="import-detail">
+    <div class="import-body">
+      <h2 id="import-title"></h2>
+      <p id="import-detail" class="import-detail"></p>
+      <div id="import-skipped" class="import-skipped hidden">
+        <p id="import-skipped-why"></p>
+        <div id="import-thumbs" class="import-thumbs"></div>
       </div>
       <div class="import-actions">
-        <button id="btn-import-done" class="btn-secondary">Done</button>
-        <button id="btn-import-add" class="btn-primary"></button>
+        <button id="btn-import-add" class="btn-secondary"></button>
+        <button id="btn-import-done" class="btn-primary">Done</button>
       </div>
     </div>
   </dialog>
