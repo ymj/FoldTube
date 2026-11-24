@@ -12,6 +12,7 @@ FoldTube is a powerful YouTube tab manager that helps you take back control of y
 
 - **One-click collapse** via the toolbar icon or `Ctrl+Shift+Y` (Windows/Linux) / `Cmd+Shift+Y` (Mac)
 - **Single-tab collapse** via `Ctrl+Shift+E` (Windows/Linux) / `Cmd+Shift+E` (Mac)
+- **Right-click menu**: fold the YouTube video page you're on, or save a link to a YouTube video without opening it
 - **Quick dashboard** without folding tabs via `Ctrl+Shift+U` (Windows/Linux) / `Cmd+Shift+U` (Mac)
 - **Organized dashboard** with separate sections for Videos and Shorts
 - **Light, Dark, and System theme** — follows your OS preference by default, or override it in Settings
@@ -170,6 +171,7 @@ npm test        # Run unit tests with Node's built-in test runner
 - Vanilla HTML / CSS / JavaScript — zero runtime dependencies, zero frameworks
 - `chrome.storage.local` for persistence
 - `chrome.scripting` for DOM metadata extraction (with `world: 'MAIN'` for ad-safe duration capture)
+- `chrome.contextMenus` for the page and link menus
 - `chrome.tabs` events and `chrome.notifications` for tab management and user feedback, with no `tabs` permission: tab URLs and titles are read only on YouTube, through the host permission
 
 ---

@@ -1,9 +1,11 @@
 /* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
 import { scrapeYouTubeTab } from '../content/scraper.js';
+import { showSavedMark } from '../content/saved-mark.js';
 import { parseVideoUrl, parseIsoDuration, formatDuration, YOUTUBE_TAB_PATTERNS } from '../lib/youtube.js';
 import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
 import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults } from '../lib/oembed.js';
+import { menuItems, linkToVideo, MENU_FOLD_TAB, MENU_SAVE_LINK } from '../lib/contextmenu.js';
 
 // ---- Saved videos: single owner ----
 
@@ -19,8 +21,11 @@ const mutateSavedVideos = createVideoStore({
 
 // ---- Shared helpers ----
 
-function notify(id, message) {
+// A notification still in the notification centre with the same ID would be
+// updated silently (no banner), so clear it first.
+async function notify(id, message) {
   try {
+    await chrome.notifications.clear(id).catch(() => {});
     chrome.notifications.create(id, {
       type: "basic",
       iconUrl: chrome.runtime.getURL("icons/icon128.png"),
@@ -28,6 +33,18 @@ function notify(id, message) {
       message,
     });
   } catch (_) { /* notifications are non-critical */ }
+}
+
+// A short badge on the toolbar icon: confirmation that shows even when the
+// OS hides notifications.
+let badgeTimer = null;
+function flashBadge(text, color) {
+  try {
+    clearTimeout(badgeTimer);
+    chrome.action.setBadgeBackgroundColor({ color });
+    chrome.action.setBadgeText({ text });
+    badgeTimer = setTimeout(() => chrome.action.setBadgeText({ text: "" }), 3000);
+  } catch (_) { /* the badge is non-critical */ }
 }
 
 // ---- Open YouTube tabs (write-ahead) ----
@@ -221,12 +238,81 @@ chrome.commands.onCommand.addListener((command) => {
 
 async function handleFoldCurrentTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true, url: YOUTUBE_TAB_PATTERNS });
+  if (tabs.length > 0) await foldOneTab(tabs[0]);
+}
 
-  if (tabs.length > 0) {
-    const { closed } = await processAndSaveTabs(tabs);
-    notify("foldtube-collapse-single",
-      closed > 0 ? "Folded current YouTube tab!" : "Couldn't fold this tab; it was left open.");
-    await handleOpenDashboard();
+// The keyboard shortcut and the "Fold this tab" menu.
+async function foldOneTab(tab) {
+  const { closed } = await processAndSaveTabs([tab]);
+  notify("foldtube-collapse-single",
+    closed > 0 ? "Folded current YouTube tab!" : "Couldn't fold this tab; it was left open.");
+  await handleOpenDashboard();
+}
+
+// ---- Right-click menus ----
+
+// Chrome keeps menus across restarts; Firefox may not. Clearing first means
+// creating them again never duplicates them.
+async function createMenus() {
+  try {
+    await chrome.contextMenus.removeAll();
+    for (const item of menuItems()) chrome.contextMenus.create(item);
+  } catch (e) {
+    console.error("FoldTube: failed to create menus", e);
+  }
+}
+
+chrome.runtime.onInstalled.addListener(createMenus);
+chrome.runtime.onStartup.addListener(createMenus);
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === MENU_FOLD_TAB && tab?.id !== undefined && parseVideoUrl(tab.url)) {
+    foldOneTab(tab);
+  } else if (info.menuItemId === MENU_SAVE_LINK) {
+    saveLink(info, tab);
+  }
+});
+
+// Save a linked video without opening it. Its title and channel are filled
+// in afterwards.
+async function saveLink(info, tab) {
+  const video = linkToVideo(info.linkUrl);
+  if (!video) return;
+  const { added } = await mutateSavedVideos(videos => applyVideoOp(videos, { type: 'add', videos: [video] }));
+  if (added) fillInMetadata();
+
+  // Confirm on the page itself, where the user is looking. Pages the
+  // extension can't draw on (browser pages, the extension stores) get the
+  // toolbar badge and a notification instead.
+  if (await showMarkOnPage(info, tab, Boolean(added))) return;
+  flashBadge(added ? "+1" : "✓", added ? "#1e8e3e" : "#5f6368");
+  notify("foldtube-save-link", added ? "Saved to FoldTube" : "Already in FoldTube");
+}
+
+let iconDataUrl = null;
+async function markIcon() {
+  if (iconDataUrl) return iconDataUrl;
+  try {
+    const bytes = new Uint8Array(await (await fetch(chrome.runtime.getURL("icons/icon48.png"))).arrayBuffer());
+    let binary = "";
+    for (const b of bytes) binary += String.fromCharCode(b);
+    iconDataUrl = `data:image/png;base64,${btoa(binary)}`;
+  } catch (_) { /* the pill works without the icon */ }
+  return iconDataUrl;
+}
+
+// Uses activeTab, which the menu click grants for this tab only.
+async function showMarkOnPage(info, tab, added) {
+  if (tab?.id === undefined || tab.id < 0) return false;
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, frameIds: [info.frameId ?? 0] },
+      func: showSavedMark,
+      args: [info.linkUrl, { added, iconUrl: await markIcon() }],
+    });
+    return result?.result === true;
+  } catch (_) {
+    return false;
   }
 }
 
