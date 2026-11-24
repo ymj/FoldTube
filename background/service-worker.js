@@ -5,7 +5,7 @@ import { parseVideoUrl, parseIsoDuration, formatDuration, positionFromPlayer, YO
 import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
 import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults } from '../lib/oembed.js';
-import { menuItems, linkToVideo, MENU_FOLD_TAB, MENU_SAVE_LINK } from '../lib/contextmenu.js';
+import { linkToVideo, MENU_FOLD_TAB, MENU_SAVE_LINK, createMenuInstaller } from '../lib/contextmenu.js';
 import { decodeStored, encodeStored, needsMigration, isActive, truncateDescription, SCHEMA_VERSION } from '../lib/archive.js';
 
 // ---- Saved videos: single owner ----
@@ -315,19 +315,12 @@ async function foldOneTab(tab) {
 
 // ---- Right-click menus ----
 
-// Chrome keeps menus across restarts; Firefox may not. Clearing first means
-// creating them again never duplicates them.
-async function createMenus() {
-  try {
-    await chrome.contextMenus.removeAll();
-    for (const item of menuItems()) chrome.contextMenus.create(item);
-  } catch (e) {
-    console.error("FoldTube: failed to create menus", e);
-  }
-}
+// Chrome keeps menus across restarts; Firefox may not. They are cleared and
+// created again, one setup at a time (see lib/contextmenu.js).
+const createMenus = createMenuInstaller(chrome.contextMenus, () => chrome.runtime.lastError);
 
-chrome.runtime.onInstalled.addListener(createMenus);
-chrome.runtime.onStartup.addListener(createMenus);
+chrome.runtime.onInstalled.addListener(() => createMenus());
+chrome.runtime.onStartup.addListener(() => createMenus());
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === MENU_FOLD_TAB && tab?.id !== undefined && parseVideoUrl(tab.url)) {
