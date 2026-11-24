@@ -2,6 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos } from '../lib/store.js';
+import { isActive } from '../lib/archive.js';
 
 const v = (videoId, extra = {}) => ({ videoId, ...extra });
 const ids = (videos) => videos.map(x => x.videoId);
@@ -52,37 +53,33 @@ describe('applyVideoOp', () => {
     assert.equal(applyVideoOp(saved, { type: 'add', videos: [v('a')] }).videos, saved);
   });
 
-  test('remove returns the removed videos with their positions', () => {
-    const { videos, result } = applyVideoOp(saved, { type: 'remove', videoIds: ['c', 'a', 'zzz'] });
-    assert.deepEqual(ids(videos), ['b']);
-    assert.deepEqual(result.removed, [{ video: v('a'), index: 0 }, { video: v('c'), index: 2 }]);
-  });
-
-  test('remove of nothing returns the same array', () => {
-    assert.equal(applyVideoOp(saved, { type: 'remove', videoIds: ['zzz'] }).videos, saved);
-  });
-
-  test('restore puts videos back at their prior positions', () => {
-    const { videos: afterRemove, result } = applyVideoOp(saved, { type: 'remove', videoIds: ['a', 'c'] });
-    const { videos } = applyVideoOp(afterRemove, { type: 'restore', entries: result.removed });
+  test('archive moves videos out of the library without removing them', () => {
+    const { videos, result } = applyVideoOp(saved, { type: 'archive', videoIds: ['c', 'a', 'zzz'], state: 'deleted' });
     assert.deepEqual(ids(videos), ['a', 'b', 'c']);
+    assert.deepEqual(result.changed, ['a', 'c']);
+    assert.deepEqual(videos.map(x => x.state), ['deleted', undefined, 'deleted']);
   });
 
-  test('restore clamps positions past the end and skips IDs saved since', () => {
-    const { videos, result } = applyVideoOp([v('b', { title: 'newer' })], {
-      type: 'restore',
-      entries: [{ video: v('b', { title: 'older' }), index: 0 }, { video: v('z'), index: 99 }],
-    });
-    assert.deepEqual(videos, [v('b', { title: 'newer' }), v('z')]);
-    assert.deepEqual(result, { restored: 1 });
+  test('archive of nothing returns the same array', () => {
+    assert.equal(applyVideoOp(saved, { type: 'archive', videoIds: ['zzz'], state: 'watched' }).videos, saved);
+  });
+
+  test('unarchive brings them back where they were', () => {
+    const { videos: after, result } = applyVideoOp(saved, { type: 'archive', videoIds: ['a', 'c'], state: 'watched' });
+    const { videos } = applyVideoOp(after, { type: 'unarchive', videoIds: result.changed });
+    assert.deepEqual(ids(videos), ['a', 'b', 'c']);
+    assert.ok(videos.every(x => x.state === 'active' || x.state === undefined));
   });
 
   test('ops never modify their input', () => {
     const input = [v('a'), v('b')];
     const copy = structuredClone(input);
     applyVideoOp(input, { type: 'add', videos: [v('x')] });
-    applyVideoOp(input, { type: 'remove', videoIds: ['a'] });
-    applyVideoOp(input, { type: 'restore', entries: [{ video: v('q'), index: 0 }] });
+    applyVideoOp(input, { type: 'archive', videoIds: ['a'], state: 'deleted' });
+    applyVideoOp(input, { type: 'unarchive', videoIds: ['a'] });
+    applyVideoOp(input, { type: 'forget', videoIds: ['a'] });
+    applyVideoOp(input, { type: 'clearHistory' });
+    applyVideoOp(input, { type: 'purge' });
     assert.deepEqual(input, copy);
   });
 
@@ -123,23 +120,26 @@ describe('createVideoStore (races)', () => {
     })();
 
     // ...meanwhile the user deletes "a".
-    await mutate(videos => applyVideoOp(videos, { type: 'remove', videoIds: ['a'] }));
+    await mutate(videos => applyVideoOp(videos, { type: 'archive', videoIds: ['a'], state: 'deleted' }));
 
     respond(new Map([['a', { title: 'A enriched' }], ['b', { title: 'B enriched' }]]));
     await enrichment;
 
-    assert.deepEqual(storage.state.videos, [v('b', { title: 'B enriched' })]);
+    const [a, b] = storage.state.videos;
+    assert.equal(a.state, 'deleted');
+    assert.equal(b.title, 'B enriched');
   });
 
   test('delete → auto-collapse save → undo: both videos are present', async () => {
     const storage = fakeStorage([v('a'), v('b')]);
     const mutate = createVideoStore(storage);
 
-    const { removed } = await mutate(videos => applyVideoOp(videos, { type: 'remove', videoIds: ['a'] }));
+    const { changed } = await mutate(videos => applyVideoOp(videos, { type: 'archive', videoIds: ['a'], state: 'deleted' }));
     await mutate(videos => applyVideoOp(videos, { type: 'add', videos: [v('auto')] }));
-    await mutate(videos => applyVideoOp(videos, { type: 'restore', entries: removed }));
+    await mutate(videos => applyVideoOp(videos, { type: 'unarchive', videoIds: changed }));
 
-    assert.deepEqual(ids(storage.state.videos), ['a', 'auto', 'b']);
+    assert.deepEqual(ids(storage.state.videos), ['auto', 'a', 'b']);
+    assert.ok(storage.state.videos.every(isActive));
   });
 
   test('concurrent folds and deletes all land', async () => {
@@ -147,16 +147,16 @@ describe('createVideoStore (races)', () => {
     const mutate = createVideoStore(storage);
     await Promise.all([
       mutate(videos => applyVideoOp(videos, { type: 'add', videos: [v('f1')] })),
-      mutate(videos => applyVideoOp(videos, { type: 'remove', videoIds: ['a'] })),
+      mutate(videos => applyVideoOp(videos, { type: 'archive', videoIds: ['a'], state: 'deleted' })),
       mutate(videos => applyVideoOp(videos, { type: 'add', videos: [v('f2'), v('f3')] })),
     ]);
-    assert.deepEqual(ids(storage.state.videos), ['f2', 'f3', 'f1', 'b']);
+    assert.deepEqual(ids(storage.state.videos.filter(isActive)), ['f2', 'f3', 'f1', 'b']);
   });
 
   test('a change that does nothing skips the write', async () => {
     const storage = fakeStorage([v('a')]);
     const mutate = createVideoStore(storage);
-    await mutate(videos => applyVideoOp(videos, { type: 'remove', videoIds: ['zzz'] }));
+    await mutate(videos => applyVideoOp(videos, { type: 'archive', videoIds: ['zzz'], state: 'deleted' }));
     assert.equal(storage.state.writes, 0);
   });
 

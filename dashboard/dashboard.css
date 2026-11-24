@@ -451,7 +451,8 @@ body {
   flex-wrap: wrap;
 }
 
-.filter-pill {
+.filter-pill,
+.history-pill {
   padding: 6px 14px;
   border-radius: 16px;
   border: 1px solid var(--border-color);
@@ -462,11 +463,13 @@ body {
   transition: all var(--transition-speed);
 }
 
-.filter-pill:hover {
+.filter-pill:hover,
+.history-pill:hover {
   background-color: var(--surface-hover);
 }
 
-.filter-pill.active {
+.filter-pill.active,
+.history-pill[aria-pressed="true"] {
   background-color: var(--text-primary);
   color: var(--bg-color);
   border-color: var(--text-primary);
@@ -939,6 +942,11 @@ body {
   opacity: 0.8;
 }
 
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ════════════════════════════════════════
    Theme Selector
    ════════════════════════════════════════ */
@@ -1122,4 +1130,442 @@ input:checked+.slider:before {
 
 #undo-toast button:hover {
   background: rgba(62, 166, 255, 0.12);
+}
+/* ════════════════════════════════════════
+   History
+   ════════════════════════════════════════ */
+
+/* After an import: what was added, what was already there, and what was
+   skipped because it is in History. */
+.import-modal {
+  max-width: 480px;
+  overflow: visible; /* the title tips may reach past the dialog's edge */
+}
+
+.import-body {
+  padding: 24px 24px 20px;
+}
+
+.import-body h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.import-detail {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.import-detail.lead {
+  color: var(--text-primary);
+}
+
+.import-detail .count {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.import-skipped {
+  margin-top: 18px;
+}
+
+.import-skipped p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+/* One row: up to five thumbnails and a "+N" tile, sharing the width. */
+.import-thumbs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.import-thumb {
+  position: relative;
+  display: block;
+  border-radius: 6px;
+  outline-offset: 2px;
+}
+
+.import-thumb img,
+.import-thumb.more {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--skeleton-base);
+}
+
+.import-thumb.more {
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* The title, on hover or keyboard focus. Edge thumbnails line up with
+   their own edge so the tip stays inside the dialog. */
+.import-thumb::after {
+  content: attr(data-title);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--text-primary);
+  color: var(--bg-color);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: pre-line;
+  text-align: start;
+  unicode-bidi: plaintext;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 1;
+}
+
+.import-thumb:nth-child(-n+2)::after {
+  left: 0;
+  transform: none;
+}
+
+.import-thumb:nth-last-child(-n+2)::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.import-thumb:hover::after,
+.import-thumb:focus-visible::after {
+  opacity: 1;
+}
+
+/* The "+N" tile lists the next titles, one per row. */
+.import-thumb.more::after {
+  content: none;
+}
+
+.import-more-list {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  border-radius: 8px;
+  background: var(--text-primary);
+  color: var(--bg-color);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: start;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 1;
+}
+
+.import-more-list li {
+  padding: 6px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
+}
+
+.import-more-list li + li {
+  border-top: 1px solid color-mix(in srgb, var(--bg-color) 18%, transparent);
+}
+
+.import-more-list li.rest {
+  opacity: 0.7;
+}
+
+.import-thumb.more:hover .import-more-list,
+.import-thumb.more:focus-visible .import-more-list {
+  opacity: 1;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.import-actions button {
+  padding: 8px 16px;
+}
+
+.history-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 16px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+}
+
+.history-btn:hover,
+.history-btn[aria-pressed="true"] {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+  background: var(--surface-hover);
+}
+
+.history-view {
+  max-width: 900px;
+}
+
+.history-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.history-top h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.history-back {
+  padding: 6px 12px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.history-back:hover {
+  background: var(--surface-hover);
+}
+
+.history-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+#history-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 12px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background-color: var(--surface-color);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.history-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.history-clear:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.history-filters {
+  margin-top: 14px;
+}
+
+.history-pill .pill-count {
+  margin-left: 4px;
+  opacity: 0.65;
+}
+
+.setting-group p.history-count {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.history-note {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.history-empty {
+  margin-top: 64px;
+}
+
+.history-day {
+  margin: 28px 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  margin-bottom: 8px;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.history-row.row-exit {
+  opacity: 0;
+  transform: translateX(-12px);
+}
+
+.history-thumb {
+  flex: none;
+  width: 120px;
+  height: 68px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--skeleton-base);
+}
+
+.history-thumb.short {
+  width: 38px;
+  margin: 0 41px;
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-info .title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-info .channel {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.history-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+}
+
+.history-badge.library {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+  border-color: transparent;
+}
+
+/* Back in the library: still listed, but quieter. */
+.history-row.back-in-library .history-thumb,
+.history-row.back-in-library .history-info .title,
+.history-row.back-in-library .history-badge.watched,
+.history-row.back-in-library .history-badge.deleted {
+  opacity: 0.55;
+}
+
+.history-badge.watched {
+  color: var(--selection-color);
+  border-color: currentColor;
+}
+
+.history-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.history-actions button {
+  padding: 6px 12px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.history-actions button:hover {
+  background: var(--surface-hover);
+}
+
+.history-actions .history-restore {
+  color: var(--selection-color);
+  font-weight: 600;
+}
+
+.history-actions .history-forget:hover {
+  color: var(--accent-color);
+}
+
+@media (max-width: 600px) {
+  .history-row {
+    flex-wrap: wrap;
+  }
+
+  .history-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }

@@ -1,7 +1,9 @@
 import {
   validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor, YOUTUBE_TAB_PATTERNS, countFoldableTabs,
-  resumeSeconds, openUrlFor, formatDuration,
+  resumeSeconds, openUrlFor, formatDuration, buildJsonExport,
 } from '../lib/youtube.js';
+import { decodeStored, isActive, isBackInLibrary, daysLeft } from '../lib/archive.js';
+import { matchesSearch, historyItems, groupByDay, expiryLabel, HISTORY_FILTERS } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 
 let allVideos = [];
@@ -91,6 +93,8 @@ async function init() {
   readShortcutRows().then(fillShortcutRefs);
   showSkeletons();
   await loadVideos();
+  // History older than 90 days goes each time the dashboard opens.
+  changeVideos({ type: 'purge' }).catch(e => console.error('FoldTube: purge failed', e));
 
   // Re-apply theme if OS preference changes while user is in 'system' mode
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -105,12 +109,14 @@ async function init() {
     if (area === "local") {
       if (changes.hasSavedBefore) hasSavedBefore = Boolean(changes.hasSavedBefore.newValue);
       if (changes.savedVideos) {
-        allVideos = changes.savedVideos.newValue || [];
+        setRecords(changes.savedVideos.newValue);
         const currentIds = new Set(allVideos.map(v => v.videoId));
         for (const id of selectedVideoIds) {
           if (!currentIds.has(id)) selectedVideoIds.delete(id);
         }
-        processAndRender();
+        if (historyOpen) renderHistory();
+        else processAndRender();
+        renderSettingsHistory();
       }
       if (changes.apiError) {
         const banner = document.getElementById('api-error-banner');
@@ -144,18 +150,23 @@ async function changeVideos(op) {
   return response.result;
 }
 
-function removeVideos(videoIds) {
-  return changeVideos({ type: 'remove', videoIds });
+// Opening a video moves it to History as watched; removing it, as deleted.
+// Undo brings back the ones that changed.
+function archiveVideos(videoIds, state) {
+  return changeVideos({ type: 'archive', videoIds, state });
 }
 
-function restoreVideos(removed) {
-  return changeVideos({ type: 'restore', entries: removed });
+// Undo: `archived` is what the archive change returned, so a video that was
+// in History before gets its earlier entry back too.
+function unarchiveVideos(archived) {
+  return changeVideos({ type: 'unarchive', videoIds: archived.changed, notes: archived.notes });
 }
 
 // ---- Undo Toast ----
 function showUndoToast(message, restoreFn) {
   clearTimeout(undoTimer);
   undoStack = restoreFn;
+  document.getElementById('btn-undo').hidden = false;
 
   const toast = document.getElementById('undo-toast');
   document.getElementById('undo-toast-msg').textContent = message;
@@ -376,6 +387,7 @@ function bindControls() {
   // Bindings are re-read each time: they may have changed since last time.
   const openSettings = () => {
     selectSettingsTab('general');
+    renderSettingsHistory();
     renderShortcuts(document.getElementById('shortcut-list'));
     settingsModal.showModal();
   };
@@ -398,7 +410,12 @@ function bindControls() {
     if (e.key === 'Escape') {
       if (settingsModal.open) { settingsModal.close(); return; }
       if (helpModal.open) { helpModal.close(); return; }
+      // From History, Esc goes back unless it is clearing a search.
+      const active = document.activeElement;
+      const typing = active.tagName === 'INPUT' && !(active.id === 'history-search' && !active.value);
+      if (historyOpen && !typing) { showHistory(false); return; }
     }
+    if (historyOpen) return;
     if (e.key === 'Delete' && selectedVideoIds.size > 0 && document.activeElement.tagName !== 'INPUT') {
       document.getElementById('btn-delete-selected').click();
     }
@@ -451,7 +468,7 @@ function bindControls() {
 
   // Export JSON
   document.getElementById('btn-export').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(allVideos, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(buildJsonExport(allRecords), null, 2)], { type: "application/json" });
     triggerDownload(blob, `foldtube_backup_${today()}.json`);
   });
 
@@ -470,13 +487,21 @@ function bindControls() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (evt) => {
+      let validItems;
       try {
-        const validItems = validateImport(JSON.parse(evt.target.result));
-        const { added } = await changeVideos({ type: 'add', videos: validItems });
-        settingsModal.close();
-        alert(`Imported ${added} new video${added === 1 ? '' : 's'}!`);
+        validItems = validateImport(JSON.parse(evt.target.result));
       } catch {
         alert("Failed to parse the JSON file. Please check it's a valid FoldTube backup.");
+        e.target.value = '';
+        return;
+      }
+      try {
+        const result = await changeVideos({ type: 'import', videos: validItems });
+        settingsModal.close();
+        showImportResult(result, validItems);
+      } catch (err) {
+        console.error('FoldTube: import failed', err);
+        alert('The backup could not be imported. Please try again.');
       }
       e.target.value = '';
     };
@@ -537,8 +562,8 @@ function bindControls() {
     removed.forEach(v => chrome.tabs.create({ url: openUrlFor(v), active: false }));
     selectedVideoIds.clear();
     updateSelectionBar();
-    const result = await removeVideos([...ids]);
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => restoreVideos(result.removed));
+    const result = await archiveVideos([...ids], 'watched');
+    showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => unarchiveVideos(result));
   });
 
   document.getElementById('btn-delete-selected').addEventListener('click', async () => {
@@ -548,9 +573,12 @@ function bindControls() {
     if (count > 1 && !confirm(`Delete ${count} selected videos?`)) return;
     selectedVideoIds.clear();
     updateSelectionBar();
-    const result = await removeVideos([...ids]);
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => restoreVideos(result.removed));
+    const result = await archiveVideos([...ids], 'deleted');
+    showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => unarchiveVideos(result));
   });
+
+  bindHistory();
+  bindImportResult();
 }
 
 // ---- Selection bar ----
@@ -562,10 +590,19 @@ function updateSelectionBar() {
 }
 
 // ---- Load & Render ----
+
+// Every record, archived ones included (for the backup), and the library:
+// the active ones, which is what the grid, search and filters show.
+let allRecords = [];
+function setRecords(stored) {
+  allRecords = decodeStored(stored);
+  allVideos = allRecords.filter(isActive);
+}
+
 async function loadVideos() {
   try {
-    const { savedVideos = [], hasSavedBefore: savedBefore } = await chrome.storage.local.get(["savedVideos", "hasSavedBefore"]);
-    allVideos = savedVideos;
+    const { savedVideos, hasSavedBefore: savedBefore } = await chrome.storage.local.get(["savedVideos", "hasSavedBefore"]);
+    setRecords(savedVideos);
     hasSavedBefore = Boolean(savedBefore);
     // Libraries from before this flag existed: having videos now counts.
     if (allVideos.length && !hasSavedBefore) {
@@ -582,13 +619,7 @@ async function loadVideos() {
 
 function getProcessedVideos() {
   let list = [...allVideos];
-  if (searchQuery) {
-    list = list.filter(v =>
-      (v.title || '').toLowerCase().includes(searchQuery) ||
-      (v.channelName || '').toLowerCase().includes(searchQuery) ||
-      (v.description || '').toLowerCase().includes(searchQuery)
-    );
-  }
+  if (searchQuery) list = list.filter(v => matchesSearch(v, searchQuery));
   if (currentDurationFilter) {
     list = list.filter(v => {
       const ds = v.durationSeconds || 0;
@@ -785,19 +816,332 @@ async function deleteSingleVideo(video, cardElement) {
   cardElement.classList.add('card-exit');
   // Remove after the exit animation; undo waits for the removal to finish.
   const removal = new Promise(resolve => setTimeout(resolve, 300))
-    .then(() => removeVideos([video.videoId]));
+    .then(() => archiveVideos([video.videoId], 'deleted'));
   const title = typeof video.title === 'string' ? video.title.trim() : '';
   const toastMsg = title
     ? `"${title.length > 40 ? title.slice(0, 40) + '…' : title}" removed`
     : 'Video removed';
-  showUndoToast(toastMsg, async () => restoreVideos((await removal).removed));
+  showUndoToast(toastMsg, async () => unarchiveVideos(await removal));
 }
 
 async function openSingleVideo(video, cardElement) {
   if (!isYouTubeUrl(video.url)) return; // not a YouTube link: keep it saved, open nothing
   chrome.tabs.create({ url: openUrlFor(video) });
   cardElement.classList.add('card-exit');
-  setTimeout(() => removeVideos([video.videoId]), 300);
+  setTimeout(() => archiveVideos([video.videoId], 'watched'), 300);
+}
+
+// ---- Import result ----
+
+// Says what an import did: how many videos were added, how many were
+// already in the library, and which were skipped because they are in
+// History (opened or removed here after the backup was made). Those can be
+// restored.
+function showImportResult({ added, inLibrary = 0, skipped = [] }, backup) {
+  const byId = new Map(backup.map(v => [v.videoId, v]));
+  const videos = (n) => `${n} video${n === 1 ? '' : 's'}`;
+  const title = document.getElementById('import-title');
+  const detail = document.getElementById('import-detail');
+
+  if (skipped.length) {
+    title.textContent = added ? `${videos(added)} imported` : 'No new videos added';
+    const parts = [];
+    if (inLibrary) parts.push(document.createTextNode(`${inLibrary} already in library`));
+    const inHistory = document.createElement('span');
+    inHistory.className = 'count';
+    const n = document.createElement('strong');
+    n.textContent = skipped.length;
+    inHistory.append(n, ' in history');
+    parts.push(inHistory);
+    detail.replaceChildren(...parts.flatMap((p, i) => (i ? [' · ', p] : [p])));
+    detail.classList.remove('lead');
+  } else if (added && !inLibrary) {
+    title.textContent = `${videos(added)} imported`;
+    detail.textContent = added === 1
+      ? 'The video from this backup was added to your library.'
+      : `All ${added} videos from this backup were added to your library.`;
+    detail.classList.add('lead');
+  } else if (added) {
+    title.textContent = `${videos(added)} imported`;
+    detail.textContent = `${inLibrary} already in library`;
+    detail.classList.remove('lead');
+  } else {
+    title.textContent = 'Library is already up to date';
+    detail.textContent = inLibrary === 1
+      ? 'The video in this backup is already in your library.'
+      : `All ${inLibrary} videos in this backup are already in your library.`;
+    detail.classList.add('lead');
+  }
+
+  document.getElementById('import-skipped-why').textContent = skipped.length === 1
+    ? 'This one was watched or removed after the backup was made:'
+    : `These ${skipped.length} were watched or removed after the backup was made:`;
+
+  // Thumbnails rather than titles: easy to tell apart, any length, any
+  // language. The title shows on hover or keyboard focus.
+  const SHOWN = 5;
+  const titleOf = (id) => byId.get(id)?.title || 'Untitled video';
+  const thumbs = skipped.slice(0, SHOWN).map(id => {
+    const wrap = document.createElement('span');
+    wrap.className = 'import-thumb';
+    wrap.tabIndex = 0;
+    wrap.dataset.title = titleOf(id);
+    const img = document.createElement('img');
+    img.src = thumbnailUrlFor(id, 'mqdefault');
+    img.alt = titleOf(id);
+    wrap.appendChild(img);
+    return wrap;
+  });
+  if (skipped.length > SHOWN) {
+    const rest = skipped.slice(SHOWN);
+    const more = document.createElement('span');
+    more.className = 'import-thumb more';
+    more.tabIndex = 0;
+    more.textContent = `+${rest.length}`;
+    // A list, not the plain one-line tip: one title per row, divided.
+    const listed = rest.slice(0, 5).map(titleOf);
+    if (rest.length > 5) listed.push(`and ${rest.length - 5} more`);
+    const tip = document.createElement('ul');
+    tip.className = 'import-more-list';
+    tip.setAttribute('aria-hidden', 'true');
+    tip.replaceChildren(...listed.map((text, i) => {
+      const li = document.createElement('li');
+      li.textContent = text;
+      if (rest.length > 5 && i === listed.length - 1) li.className = 'rest';
+      return li;
+    }));
+    more.appendChild(tip);
+    more.setAttribute('aria-label', `${rest.length} more: ${listed.join(', ')}`);
+    thumbs.push(more);
+  }
+  document.getElementById('import-thumbs').replaceChildren(...thumbs);
+
+  const asking = skipped.length > 0;
+  document.getElementById('import-skipped').classList.toggle('hidden', !asking);
+  const restore = document.getElementById('btn-import-add');
+  restore.classList.toggle('hidden', !asking);
+  restore.textContent = `Restore ${skipped.length}`;
+  pendingSkipped = skipped.map(id => byId.get(id)).filter(Boolean);
+  document.getElementById('import-modal').showModal();
+  document.getElementById('btn-import-done').focus();
+}
+
+let pendingSkipped = [];
+
+function bindImportResult() {
+  const modal = document.getElementById('import-modal');
+  const close = () => { pendingSkipped = []; modal.close(); };
+  document.getElementById('btn-import-done').addEventListener('click', close);
+  document.getElementById('btn-import-add').addEventListener('click', async () => {
+    const videos = pendingSkipped;
+    close();
+    if (!videos.length) return;
+    // The same as saving them again: back in the library, still listed in
+    // History as back in library.
+    const { added } = await changeVideos({ type: 'add', videos });
+    showMessageToast(`Restored ${added} video${added === 1 ? '' : 's'} to your library.`);
+  });
+}
+
+// A short message in the toast, without Undo.
+function showMessageToast(message) {
+  clearTimeout(undoTimer);
+  undoStack = null;
+  const toast = document.getElementById('undo-toast');
+  document.getElementById('undo-toast-msg').textContent = message;
+  document.getElementById('btn-undo').hidden = true;
+  toast.classList.add('visible');
+  undoTimer = setTimeout(() => {
+    toast.classList.remove('visible');
+    document.getElementById('btn-undo').hidden = false;
+  }, 4000);
+}
+
+// ---- History ----
+
+let historyOpen = false;
+let historyQuery = '';
+let historyFilter = 'all';
+
+function showHistory(open) {
+  historyOpen = open;
+  const button = document.getElementById('btn-history');
+  button.setAttribute('aria-pressed', String(open));
+  document.getElementById('history-view').classList.toggle('hidden', !open);
+  // The library's own screen, with its search bar and selection.
+  document.querySelector('.main-content:not(.history-view)').classList.toggle('hidden', open);
+  if (open) {
+    document.getElementById('controls-bar').classList.add('hidden');
+    document.getElementById('selection-bar').classList.add('hidden');
+    renderHistory();
+    document.getElementById('history-search').focus();
+  } else {
+    processAndRender();
+    button.focus();
+  }
+  window.scrollTo(0, 0);
+}
+
+function bindHistory() {
+  document.getElementById('btn-history').addEventListener('click', () => showHistory(!historyOpen));
+  document.getElementById('btn-history-back').addEventListener('click', () => showHistory(false));
+  document.getElementById('history-search').addEventListener('input', debounce((e) => {
+    historyQuery = e.target.value.trim().toLowerCase();
+    renderHistory();
+  }, 150));
+
+  document.getElementById('history-filters').addEventListener('click', (e) => {
+    const pill = e.target.closest('.history-pill');
+    if (!pill) return;
+    historyFilter = pill.dataset.filter;
+    renderHistory();
+  });
+
+  document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
+  document.getElementById('btn-settings-clear-history').addEventListener('click', clearHistory);
+
+  // One listener for every row.
+  document.getElementById('history-list').addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-action]');
+    const row = button?.closest('.history-row');
+    if (!row) return;
+    button.disabled = true;
+    // Restored videos stay listed, now marked as back in the library.
+    const restoring = button.dataset.action === 'restore';
+    if (!restoring || historyFilter !== 'all') row.classList.add('row-exit');
+    const op = restoring
+      ? { type: 'unarchive', videoIds: [row.dataset.id], fromHistory: true }
+      : { type: 'forget', videoIds: [row.dataset.id] };
+    setTimeout(() => {
+      changeVideos(op).catch(err => {
+        console.error('FoldTube: history change failed', err);
+        row.classList.remove('row-exit');
+        button.disabled = false;
+      });
+    }, restoring ? 0 : 200);
+  });
+}
+
+// From the History screen and from Settings → Advanced.
+async function clearHistory() {
+  const items = historyItems(allRecords);
+  if (!items.length) return;
+  const gone = items.filter(v => !isActive(v)).length;
+  const back = items.length - gone;
+  const message = gone
+    ? `Clear History? ${gone} video${gone === 1 ? '' : 's'} you opened or removed will be deleted forever.`
+      + `${back ? ' Videos back in your library stay there.' : ''} This can't be undone.`
+    : 'Clear History? Videos back in your library stay there.';
+  if (!confirm(message)) return;
+  await changeVideos({ type: 'clearHistory' });
+}
+
+// The History line in Settings → Advanced.
+function renderSettingsHistory() {
+  const count = historyItems(allRecords).length;
+  document.getElementById('settings-history-count').textContent = count
+    ? `${count} video${count === 1 ? '' : 's'} in History`
+    : 'No videos in History';
+  document.getElementById('btn-settings-clear-history').disabled = count === 0;
+}
+
+function renderHistory() {
+  const all = historyItems(allRecords);
+  const searched = historyQuery ? all.filter(v => matchesSearch(v, historyQuery)) : all;
+  const items = searched.filter(HISTORY_FILTERS[historyFilter]);
+  const list = document.getElementById('history-list');
+
+  document.querySelectorAll('.history-pill').forEach(pill => {
+    const filter = pill.dataset.filter;
+    pill.setAttribute('aria-pressed', String(filter === historyFilter));
+    const count = searched.filter(HISTORY_FILTERS[filter]).length;
+    pill.querySelector('.pill-count').textContent = ` ${count}`;
+  });
+  document.getElementById('history-filters').classList.toggle('hidden', all.length === 0);
+
+  document.querySelector('.video-count').classList.remove('hidden');
+  document.querySelector('.video-count').textContent = `${all.length} in History`;
+  document.getElementById('btn-clear-history').disabled = all.length === 0;
+  document.getElementById('btn-clear-history').classList.toggle('hidden', all.length === 0);
+  document.querySelector('.history-controls').classList.toggle('hidden', all.length === 0);
+  document.querySelector('.history-note').classList.toggle('hidden', all.length === 0);
+  document.getElementById('history-empty').classList.toggle('hidden', all.length > 0);
+  document.getElementById('history-no-results').classList.toggle('hidden', !(all.length > 0 && items.length === 0));
+
+  const now = new Date();
+  const fragment = document.createDocumentFragment();
+  for (const group of groupByDay(items, now)) {
+    const heading = document.createElement('h3');
+    heading.className = 'history-day';
+    heading.textContent = group.label;
+    fragment.appendChild(heading);
+    for (const video of group.items) fragment.appendChild(createHistoryRow(video, now));
+  }
+  list.replaceChildren(fragment);
+}
+
+function createHistoryRow(video, now) {
+  const back = isBackInLibrary(video);
+  const row = document.createElement('div');
+  row.className = back ? 'history-row back-in-library' : 'history-row';
+  row.dataset.id = video.videoId;
+
+  const img = document.createElement('img');
+  img.className = video.videoType === 'short' ? 'history-thumb short' : 'history-thumb';
+  img.loading = 'lazy';
+  img.alt = '';
+  img.src = thumbnailUrlFor(video.videoId, 'mqdefault');
+  img.onerror = function() { this.onerror = null; this.src = thumbnailUrlFor(video.videoId, 'hqdefault'); };
+
+  const info = document.createElement('div');
+  info.className = 'history-info';
+  const title = document.createElement('p');
+  title.className = 'title';
+  title.title = video.title || '';
+  title.textContent = video.title || '';
+  const channel = document.createElement('span');
+  channel.className = 'channel';
+  channel.textContent = video.channelName || '';
+
+  const meta = document.createElement('div');
+  meta.className = 'history-meta';
+  // What happened (watched or deleted), then where the video is now.
+  const how = back ? video.archivedAs : video.state;
+  const badge = document.createElement('span');
+  badge.className = `history-badge ${how}`;
+  badge.textContent = how === 'watched' ? 'Watched' : 'Deleted';
+  meta.appendChild(badge);
+  if (back) {
+    const where = document.createElement('span');
+    where.className = 'history-badge library';
+    where.textContent = 'Back in library';
+    meta.appendChild(where);
+  } else {
+    const expiry = document.createElement('span');
+    expiry.textContent = expiryLabel(daysLeft(video, now));
+    meta.appendChild(expiry);
+  }
+  info.append(title, channel, meta);
+
+  const actions = document.createElement('div');
+  actions.className = 'history-actions';
+  if (back) {
+    row.append(img, info, actions);
+    return row;
+  }
+  const restore = document.createElement('button');
+  restore.className = 'history-restore';
+  restore.dataset.action = 'restore';
+  restore.textContent = 'Restore';
+  restore.title = 'Put back in your library';
+  const forget = document.createElement('button');
+  forget.className = 'history-forget';
+  forget.dataset.action = 'forget';
+  forget.textContent = 'Delete forever';
+  actions.append(restore, forget);
+
+  row.append(img, info, actions);
+  return row;
 }
 
 // ---- Utilities ----
