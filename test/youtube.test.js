@@ -133,6 +133,7 @@ describe('urlToVideoData', () => {
       description: '',
       dateSaved: '2026-01-02T03:04:05.000Z',
       metadataSource: 'auto-collapsed',
+      timestampSeconds: 0,
     });
   });
 

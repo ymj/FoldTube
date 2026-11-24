@@ -282,6 +282,26 @@ body {
   font-weight: 500;
 }
 
+/* Where the video was left off, like YouTube's red watched bar. */
+.resume-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.35);
+}
+
+.resume-bar {
+  height: 100%;
+  background-color: #f00;
+}
+
+.resume-label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
 .card-content {
   padding: 12px;
   position: relative;

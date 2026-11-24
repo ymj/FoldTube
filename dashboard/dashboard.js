@@ -1,4 +1,7 @@
-import { validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor, YOUTUBE_TAB_PATTERNS, countFoldableTabs } from '../lib/youtube.js';
+import {
+  validateImport, buildHtmlExport, isYouTubeUrl, thumbnailUrlFor, YOUTUBE_TAB_PATTERNS, countFoldableTabs,
+  resumeSeconds, openUrlFor, formatDuration,
+} from '../lib/youtube.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 
 let allVideos = [];
@@ -531,7 +534,7 @@ function bindControls() {
     const ids = new Set(removed.map(v => v.videoId));
     const count = removed.length;
     if (count === 0) return;
-    removed.forEach(v => chrome.tabs.create({ url: v.url, active: false }));
+    removed.forEach(v => chrome.tabs.create({ url: openUrlFor(v), active: false }));
     selectedVideoIds.clear();
     updateSelectionBar();
     const result = await removeVideos([...ids]);
@@ -705,6 +708,18 @@ function createCard(video, index) {
     durBadge.textContent = video.durationFormatted;
     thumbContainer.appendChild(durBadge);
   }
+
+  // Where it was left off: a progress bar when the length is known.
+  const resumeAt = resumeSeconds(video);
+  if (resumeAt > 0 && video.durationSeconds > 0) {
+    const track = document.createElement('div');
+    track.className = 'resume-track';
+    const bar = document.createElement('div');
+    bar.className = 'resume-bar';
+    bar.style.width = `${Math.min(100, (resumeAt / video.durationSeconds) * 100)}%`;
+    track.appendChild(bar);
+    thumbContainer.appendChild(track);
+  }
   card.appendChild(thumbContainer);
 
   // Card content
@@ -728,6 +743,12 @@ function createCard(video, index) {
   const dateSaved = document.createElement('div');
   dateSaved.className = 'date-saved';
   dateSaved.textContent = `Saved: ${date}`;
+  if (resumeAt > 0) {
+    const resume = document.createElement('span');
+    resume.className = 'resume-label';
+    resume.textContent = `Resume at ${formatDuration(resumeAt)}`;
+    dateSaved.append(' · ', resume);
+  }
   cardContent.appendChild(dateSaved);
 
   const deleteBtn = document.createElement('button');
@@ -774,7 +795,7 @@ async function deleteSingleVideo(video, cardElement) {
 
 async function openSingleVideo(video, cardElement) {
   if (!isYouTubeUrl(video.url)) return; // not a YouTube link: keep it saved, open nothing
-  chrome.tabs.create({ url: video.url });
+  chrome.tabs.create({ url: openUrlFor(video) });
   cardElement.classList.add('card-exit');
   setTimeout(() => removeVideos([video.videoId]), 300);
 }
