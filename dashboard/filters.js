@@ -44,8 +44,11 @@ export function libraryView(videos, { query = '', duration = null, sort = 'date-
   return compare ? list.sort(compare) : list;
 }
 
-/** The Group by menu's choices. */
-export const GROUP_BY = ['none', 'channel'];
+/** The Group by menu's choices: no grouping, or by channel in an order. */
+export const GROUP_BY = ['none', 'channel-az', 'channel-za', 'channel-recent', 'channel-count'];
+
+/** Sort choices that mean nothing inside a channel group. */
+export const CHANNEL_SORTS = ['chan-asc', 'chan-desc'];
 
 /** The group a video belongs to: its channel name, or '' when unknown. */
 export function channelKey(video) {
@@ -53,28 +56,41 @@ export function channelKey(video) {
 }
 
 // Channel names A to Z: case and accents ignored, "Top 10" before "Top 100".
-// Names starting with a letter come first, then numbers and symbols, then
-// the unknown channel.
-const rank = (key) => (key === '' ? 2 : /^\p{L}/u.test(key) ? 0 : 1);
 const byName = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true }).compare;
+// In the name orders, names starting with a letter come first, then numbers
+// and symbols.
+const startsWithLetter = (key) => /^\p{L}/u.test(key);
+const byLettersFirst = (a, b) => startsWithLetter(b.key) - startsWithLetter(a.key);
+
+const GROUP_ORDERS = {
+  'channel-az': (a, b) => byLettersFirst(a, b) || byName(a.key, b.key),
+  'channel-za': (a, b) => byLettersFirst(a, b) || byName(b.key, a.key),
+  'channel-recent': (a, b) => b.newest - a.newest || byName(a.key, b.key),
+  'channel-count': (a, b) => b.videos.length - a.videos.length || byName(a.key, b.key),
+};
 
 /**
  * Split videos (already sorted) into one group per channel. Videos keep their
- * order inside a group. Groups come A to Z, ignoring case and accents, with
- * numbers in number order; names that start with a number or symbol come
- * after the letters, and the unknown channel ('') always comes last.
+ * order inside a group. Groups come in the order asked for (A to Z by
+ * default); the unknown channel ('') always comes last.
  * @param {object[]} videos
+ * @param {string} [order] one of GROUP_BY, other than 'none'
  * @returns {{ key: string, videos: object[] }[]}
  */
-export function groupByChannel(videos) {
+export function groupByChannel(videos, order = 'channel-az') {
   const groups = new Map();
   for (const video of videos) {
     const key = channelKey(video);
     let group = groups.get(key);
-    if (!group) groups.set(key, group = { key, videos: [] });
+    if (!group) groups.set(key, group = { key, videos: [], newest: -Infinity });
     group.videos.push(video);
+    const saved = Date.parse(video.dateSaved);
+    if (saved > group.newest) group.newest = saved;
   }
-  return [...groups.values()].sort((a, b) => rank(a.key) - rank(b.key) || byName(a.key, b.key));
+  const compare = GROUP_ORDERS[order] || GROUP_ORDERS['channel-az'];
+  return [...groups.values()]
+    .sort((a, b) => (a.key === '') - (b.key === '') || compare(a, b))
+    .map(({ key, videos: list }) => ({ key, videos: list }));
 }
 
 /** Shorts get their own section; everything else is a video. */

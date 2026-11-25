@@ -27,7 +27,7 @@ function sectionOf(video) {
 /** The videos Select all picks: what's on screen, not in collapsed groups. */
 export function selectableVideos() {
   const videos = visibleVideos();
-  if (state.library.groupBy !== 'channel') return videos;
+  if (state.library.groupBy === 'none') return videos;
   return videos.filter(v => !state.library.collapsed.has(groupId(sectionOf(v), channelKey(v))));
 }
 
@@ -108,7 +108,7 @@ export function renderLibrary() {
     videosSection.classList.toggle('hidden', standard.length === 0);
     shortsSection.classList.toggle('hidden', shorts.length === 0);
     // Under a channel header, each card repeating the channel adds nothing.
-    const byChannel = state.library.groupBy === 'channel';
+    const byChannel = state.library.groupBy !== 'none';
     videoGrid.classList.toggle('by-channel', byChannel);
     shortsGrid.classList.toggle('by-channel', byChannel);
     videoGrid.replaceChildren(...sectionContent('videos', standard));
@@ -123,9 +123,9 @@ export function renderLibrary() {
 // The cards of one section, or with Group by channel, a group per channel:
 // a header, then its cards.
 function sectionContent(section, videos) {
-  if (state.library.groupBy !== 'channel') return videos.map(createCard);
+  if (state.library.groupBy === 'none') return videos.map(createCard);
   let index = 0;
-  return groupByChannel(videos).map(({ key, videos: list }) => {
+  return groupByChannel(videos, state.library.groupBy).map(({ key, videos: list }) => {
     const id = groupId(section, key);
     const collapsed = state.library.collapsed.has(id);
     const group = document.createElement('div');

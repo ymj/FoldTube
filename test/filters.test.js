@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, groupByChannel, GROUP_BY, SORTS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, splitByType, groupByChannel, GROUP_BY, CHANNEL_SORTS, SORTS } from '../dashboard/filters.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -111,11 +111,31 @@ describe('group by channel', () => {
     assert.deepEqual(groups.map(g => g.key), ['amy', 'Bob', '_under', '@home', '2 Minute', '3Blue1Brown', '10 Minute', '']);
   });
 
+  test('Group by orders: Z to A, recently saved, most videos; unknown always last', () => {
+    const mixed = [...library, v('n1', { channelName: '9 Lives', dateSaved: at(30) })];
+    const order = (o) => groupByChannel(libraryView(mixed), o).map(g => g.key);
+    assert.deepEqual(order('channel-az'), ['Amy', 'Bob', 'Cat', '9 Lives', '']);
+    assert.deepEqual(order('channel-za'), ['Cat', 'Bob', 'Amy', '9 Lives', '']);
+    assert.deepEqual(order('channel-recent'), ['9 Lives', 'Amy', 'Bob', 'Cat', '']);
+    assert.deepEqual(order('channel-count'), ['Amy', 'Cat', '9 Lives', 'Bob', '']);
+    assert.deepEqual(order('nope'), order('channel-az'));
+  });
+
+  test('recently saved: ties by name; unknown dates after known ones', () => {
+    const tie = [v('z', { channelName: 'Zed', dateSaved: at(1) }), v('y', { channelName: 'Yan', dateSaved: at(1) }), v('n', { channelName: 'Nod', dateSaved: 'nope' })];
+    assert.deepEqual(groupByChannel(tie, 'channel-recent').map(g => g.key), ['Yan', 'Zed', 'Nod']);
+  });
+
+  test('the Channel Name sorts are the ones hidden while grouped', () => {
+    assert.deepEqual(CHANNEL_SORTS.filter(s => s in SORTS), CHANNEL_SORTS);
+    assert.deepEqual(Object.keys(SORTS).filter(s => s.startsWith('chan-')), CHANNEL_SORTS);
+  });
+
   test('the Group by menu offers exactly these choices', async () => {
-    assert.deepEqual(GROUP_BY, ['none', 'channel']);
+    assert.deepEqual(GROUP_BY, ['none', 'channel-az', 'channel-za', 'channel-recent', 'channel-count']);
     const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
     const select = html.match(/<select id="group-select"[\s\S]*?<\/select>/)?.[0] ?? '';
-    assert.deepEqual([...select.matchAll(/value="(\w+)"/g)].map(m => m[1]), GROUP_BY);
+    assert.deepEqual([...select.matchAll(/value="([\w-]+)"/g)].map(m => m[1]), GROUP_BY);
   });
 
   test('500 videos from 150 channels group quickly', () => {

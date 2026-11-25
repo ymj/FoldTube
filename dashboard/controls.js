@@ -7,6 +7,7 @@ import { isActive } from '../lib/archive.js';
 import { historyItems } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 import { state } from './state.js';
+import { CHANNEL_SORTS } from './filters.js';
 import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError, saveLibraryView } from './store.js';
 import {
   selectableVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
@@ -45,20 +46,24 @@ function keepHeaderInView(group) {
   if (top < stuckAt) window.scrollBy(0, top - stuckAt);
 }
 
-// Channel headers stick below the page header and the selection bar, whose
-// heights change with the window width and with what's selected.
+// The controls bar sticks below the page header and the selection bar, and
+// channel headers below all three; their heights change with the window
+// width, with what's selected, and when the controls hide (empty library).
 function bindStickyOffsets() {
   const root = document.documentElement;
   const header = document.querySelector('.header');
   const bar = document.getElementById('selection-bar');
+  const controls = document.getElementById('controls-bar');
   // Exact heights, not rounded: a rounded-down height leaves a strip of the
   // cards behind showing above a stuck header.
   const update = () => {
     root.style.setProperty('--header-height', `${header.getBoundingClientRect().height}px`);
     root.style.setProperty('--selection-bar-height', `${bar.getBoundingClientRect().height}px`);
+    root.style.setProperty('--controls-height', `${controls.getBoundingClientRect().height}px`);
   };
   new ResizeObserver(update).observe(header);
   new ResizeObserver(update).observe(bar);
+  new ResizeObserver(update).observe(controls);
   update();
 }
 
@@ -94,6 +99,22 @@ export function showSettings() {
 /** Put the remembered Group by choice into its menu. */
 export function showLibraryView() {
   document.getElementById('group-select').value = state.library.groupBy;
+  syncSortChoices();
+}
+
+// Grouped by channel, every video in a group has the same channel: the
+// Channel Name sorts would do nothing, so they're hidden, and a picked one
+// falls back to newest first.
+function syncSortChoices() {
+  const grouped = state.library.groupBy !== 'none';
+  const select = document.getElementById('sort-select');
+  for (const option of select.options) {
+    if (CHANNEL_SORTS.includes(option.value)) option.hidden = option.disabled = grouped;
+  }
+  if (grouped && CHANNEL_SORTS.includes(state.library.sort)) {
+    state.library.sort = 'date-desc';
+    select.value = 'date-desc';
+  }
 }
 
 async function saveAndShowSettings() {
@@ -436,6 +457,7 @@ function bindLibraryControls() {
 
   document.getElementById('group-select').addEventListener('change', (e) => {
     view.groupBy = e.target.value;
+    syncSortChoices();
     renderLibrary();
     saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
   });
