@@ -75,7 +75,7 @@ describe('group by channel', () => {
   ];
   const shape = (groups) => groups.map(g => [g.key, ids(g.videos)]);
 
-  test('one group per channel, newest saved video first; unknown last', () => {
+  test('one group per channel, A to Z; unknown last', () => {
     assert.deepEqual(shape(groupByChannel(libraryView(library))), [
       ['Amy', ['a2', 'a1']],
       ['Bob', ['b1']],
@@ -99,9 +99,10 @@ describe('group by channel', () => {
     assert.deepEqual(groupByChannel([]), []);
   });
 
-  test('same newest date: by name; unknown dates sort after known ones', () => {
-    const tie = [v('z', { channelName: 'Zed', dateSaved: at(1) }), v('y', { channelName: 'Yan', dateSaved: at(1) }), v('n', { channelName: 'Nod', dateSaved: 'nope' })];
-    assert.deepEqual(groupByChannel(tie).map(g => g.key), ['Yan', 'Zed', 'Nod']);
+  test('A to Z ignores case and accents, and reads numbers as numbers', () => {
+    const names = ['zed', 'Émile', 'Top 100', 'amy', 'Top 9', 'Bob', 'Eve'];
+    const groups = groupByChannel(names.map((channelName, i) => v(`x${i}`, { channelName })));
+    assert.deepEqual(groups.map(g => g.key), ['amy', 'Bob', 'Émile', 'Eve', 'Top 9', 'Top 100', 'zed']);
   });
 
   test('the Group by menu offers exactly these choices', async () => {

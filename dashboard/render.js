@@ -107,6 +107,10 @@ export function renderLibrary() {
     const { standard, shorts } = splitByType(videos);
     videosSection.classList.toggle('hidden', standard.length === 0);
     shortsSection.classList.toggle('hidden', shorts.length === 0);
+    // Under a channel header, each card repeating the channel adds nothing.
+    const byChannel = state.library.groupBy === 'channel';
+    videoGrid.classList.toggle('by-channel', byChannel);
+    shortsGrid.classList.toggle('by-channel', byChannel);
     videoGrid.replaceChildren(...sectionContent('videos', standard));
     shortsGrid.replaceChildren(...sectionContent('shorts', shorts));
   } catch (err) {

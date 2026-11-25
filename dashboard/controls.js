@@ -33,6 +33,22 @@ export function bindControls() {
   bindEmptyState();
   bindHistory();
   bindImportResult();
+  bindStickyOffsets();
+}
+
+// Channel headers stick below the page header and the selection bar, whose
+// heights change with the window width and with what's selected.
+function bindStickyOffsets() {
+  const root = document.documentElement;
+  const header = document.querySelector('.header');
+  const bar = document.getElementById('selection-bar');
+  const update = () => {
+    root.style.setProperty('--header-height', `${header.offsetHeight}px`);
+    root.style.setProperty('--selection-bar-height', `${bar.offsetHeight}px`);
+  };
+  new ResizeObserver(update).observe(header);
+  new ResizeObserver(update).observe(bar);
+  update();
 }
 
 // ---- Theme ----

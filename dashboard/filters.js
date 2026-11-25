@@ -52,10 +52,13 @@ export function channelKey(video) {
   return typeof video.channelName === 'string' ? video.channelName.trim() : '';
 }
 
+// Channel names A to Z: case and accents ignored, "Top 10" before "Top 100".
+const byName = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true }).compare;
+
 /**
  * Split videos (already sorted) into one group per channel. Videos keep their
- * order inside a group. Groups come newest first, by their most recently
- * saved video; the unknown channel ('') always comes last.
+ * order inside a group. Groups come A to Z, ignoring case and accents, with
+ * numbers in number order; the unknown channel ('') always comes last.
  * @param {object[]} videos
  * @returns {{ key: string, videos: object[] }[]}
  */
@@ -64,14 +67,10 @@ export function groupByChannel(videos) {
   for (const video of videos) {
     const key = channelKey(video);
     let group = groups.get(key);
-    if (!group) groups.set(key, group = { key, videos: [], newest: -Infinity });
+    if (!group) groups.set(key, group = { key, videos: [] });
     group.videos.push(video);
-    const saved = Date.parse(video.dateSaved);
-    if (saved > group.newest) group.newest = saved;
   }
-  return [...groups.values()]
-    .sort((a, b) => (a.key === '') - (b.key === '') || (b.newest - a.newest) || a.key.localeCompare(b.key))
-    .map(({ key, videos: list }) => ({ key, videos: list }));
+  return [...groups.values()].sort((a, b) => (a.key === '') - (b.key === '') || byName(a.key, b.key));
 }
 
 /** Shorts get their own section; everything else is a video. */
