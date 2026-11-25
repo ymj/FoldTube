@@ -407,6 +407,9 @@ body {
 
 .group-header {
   grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   position: sticky;
   /* Below the page header and, while it shows, the selection bar; tucked
      1px under them so no sliver of the cards shows between. */
@@ -427,6 +430,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   max-width: 100%;
   padding: 4px 8px 4px 4px;
   margin-left: -4px;
@@ -463,6 +467,52 @@ body {
 
 .video-group.collapsed .group-toggle::before {
   transform: rotate(-45deg);
+}
+
+/* Open all / Clear group: quiet until the header is hovered or focused;
+   always shown where there's no hover (touch). */
+.group-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--transition-speed);
+}
+
+.group-header:hover .group-actions,
+.group-header:focus-within .group-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .group-actions {
+    opacity: 1;
+  }
+}
+
+.group-action {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.group-action:hover {
+  border-color: var(--border-color);
+  background-color: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.group-action:focus-visible {
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 1px;
 }
 
 .group-name {

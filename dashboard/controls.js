@@ -10,7 +10,7 @@ import { state } from './state.js';
 import { SORT_FIELDS, parseSort } from './filters.js';
 import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError, saveLibraryView } from './store.js';
 import {
-  selectableVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
+  selectableVideos, groupVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
   renderImportResult, refreshEmptyState, updateSelectionBar, setCardSelected,
 } from './render.js';
 
@@ -573,6 +573,13 @@ function bindCards() {
     });
 
     grid.addEventListener('click', (e) => {
+      const action = e.target.closest('.group-action');
+      if (action) {
+        const videos = groupVideos(action.closest('.video-group').dataset.group);
+        if (action.dataset.action === 'open') openVideos(videos);
+        else removeVideos(videos);
+        return;
+      }
       const toggle = e.target.closest('.group-toggle');
       if (toggle) {
         const group = toggle.closest('.video-group');
@@ -637,31 +644,45 @@ function bindBulkActions() {
     document.querySelectorAll('.video-card').forEach(c => c.classList.remove('selected'));
   });
 
-  document.getElementById('btn-open-selected').addEventListener('click', async () => {
-    if (!selected.size) return;
-    if (selected.size > 10 && !confirm(`This will open ${selected.size} tabs. Continue?`)) return;
-    // Only entries with a YouTube link are opened and removed; others stay saved.
-    const removed = state.videos.filter(v => selected.has(v.videoId) && isYouTubeUrl(v.url));
-    const ids = new Set(removed.map(v => v.videoId));
-    const count = removed.length;
-    if (count === 0) return;
-    removed.forEach(v => chrome.tabs.create({ url: openUrlFor(v), active: false }));
-    selected.clear();
-    updateSelectionBar();
-    const result = await archiveVideos([...ids], 'watched');
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => unarchiveVideos(result));
+  document.getElementById('btn-open-selected').addEventListener('click', () => {
+    openVideos(state.videos.filter(v => selected.has(v.videoId)));
   });
 
-  document.getElementById('btn-delete-selected').addEventListener('click', async () => {
-    if (!selected.size) return;
-    const ids = new Set(selected);
-    const count = ids.size;
-    if (count > 1 && !confirm(`Delete ${count} selected videos?`)) return;
-    selected.clear();
-    updateSelectionBar();
-    const result = await archiveVideos([...ids], 'deleted');
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => unarchiveVideos(result));
+  document.getElementById('btn-delete-selected').addEventListener('click', () => {
+    removeVideos(state.videos.filter(v => selected.has(v.videoId)));
   });
+}
+
+// Open videos in new tabs and move them to History as watched, with Undo.
+// Used by Open Selected and a group's Open all.
+async function openVideos(videos) {
+  // Only entries with a YouTube link are opened and removed; others stay saved.
+  const opened = videos.filter(v => isYouTubeUrl(v.url));
+  const count = opened.length;
+  if (count === 0) return;
+  if (count > 10 && !confirm(`This will open ${count} tabs. Continue?`)) return;
+  opened.forEach(v => chrome.tabs.create({ url: openUrlFor(v), active: false }));
+  const ids = opened.map(v => v.videoId);
+  deselect(ids);
+  const result = await archiveVideos(ids, 'watched');
+  showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => unarchiveVideos(result));
+}
+
+// Remove videos (to History as deleted), with Undo. Used by Delete Selected
+// and a group's Clear group.
+async function removeVideos(videos) {
+  const count = videos.length;
+  if (count === 0) return;
+  if (count > 1 && !confirm(`Delete ${count} videos?`)) return;
+  const ids = videos.map(v => v.videoId);
+  deselect(ids);
+  const result = await archiveVideos(ids, 'deleted');
+  showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => unarchiveVideos(result));
+}
+
+function deselect(ids) {
+  ids.forEach(id => state.selected.delete(id));
+  updateSelectionBar();
 }
 
 // ---- Empty state ----

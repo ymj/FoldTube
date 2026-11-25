@@ -24,6 +24,11 @@ function sectionOf(video) {
   return video.videoType === 'short' ? 'shorts' : 'videos';
 }
 
+/** A group's videos as the grid shows them (searched and filtered), collapsed or not. */
+export function groupVideos(id) {
+  return visibleVideos().filter(v => groupId(sectionOf(v), channelKey(v)) === id);
+}
+
 /** The videos Select all picks: what's on screen, not in collapsed groups. */
 export function selectableVideos() {
   const videos = visibleVideos();
@@ -145,7 +150,24 @@ function sectionContent(section, videos) {
     count.className = 'group-count';
     count.textContent = `· ${list.length}`;
     toggle.append(name, count);
-    header.appendChild(toggle);
+
+    // Shown on hover or focus: act on the whole group at once.
+    const actions = document.createElement('span');
+    actions.className = 'group-actions';
+    const label = key || 'Unknown channel';
+    const openAll = document.createElement('button');
+    openAll.className = 'group-action';
+    openAll.dataset.action = 'open';
+    openAll.textContent = `Open all (${list.length})`;
+    openAll.setAttribute('aria-label', `Open all ${list.length} from ${label}`);
+    const clear = document.createElement('button');
+    clear.className = 'group-action';
+    clear.dataset.action = 'clear';
+    clear.textContent = 'Clear group';
+    clear.setAttribute('aria-label', `Remove all ${list.length} from ${label}`);
+    actions.append(openAll, clear);
+
+    header.append(toggle, actions);
 
     group.append(header, ...list.map(video => createCard(video, index++)));
     return group;
