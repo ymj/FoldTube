@@ -14,6 +14,7 @@
   --skeleton-shine: #ebebeb;
   --accent-color: #ff0000;
   --selection-color: #065fd4;
+  --danger-color: #e5484d;
 
   /* Non-theme tokens */
   --border-radius: 8px;
@@ -474,7 +475,7 @@ body {
 .group-actions {
   display: flex;
   flex: none;
-  gap: 4px;
+  gap: 8px;
   margin-left: auto;
   opacity: 0;
   transition: opacity var(--transition-speed);
@@ -491,28 +492,55 @@ body {
   }
 }
 
+/* Two distinct buttons: Open all lifts like a normal button on hover;
+   Clear group turns red, and solid red while it asks to be sure. */
 .group-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  background: none;
+  background-color: var(--surface-color);
   color: var(--text-secondary);
   font: inherit;
   font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
+  transition: background-color var(--transition-speed), border-color var(--transition-speed), color var(--transition-speed);
 }
 
-.group-action:hover {
-  border-color: var(--border-color);
+.group-action svg {
+  flex: none;
+}
+
+.group-action.open:hover {
+  border-color: var(--text-secondary);
   background-color: var(--surface-hover);
   color: var(--text-primary);
+}
+
+.group-action.clear:hover {
+  border-color: var(--danger-color);
+  background-color: color-mix(in srgb, var(--danger-color) 12%, transparent);
+  color: var(--danger-color);
+}
+
+.group-action.clear.confirming {
+  border-color: var(--danger-color);
+  background-color: var(--danger-color);
+  color: #fff;
 }
 
 .group-action:focus-visible {
   outline: 2px solid var(--text-secondary);
   outline-offset: 1px;
+}
+
+/* Asking to be sure keeps the actions visible after the pointer leaves. */
+.group-actions:has(.confirming) {
+  opacity: 1;
 }
 
 .group-name {

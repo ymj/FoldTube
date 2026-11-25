@@ -151,27 +151,44 @@ function sectionContent(section, videos) {
     count.textContent = `· ${list.length}`;
     toggle.append(name, count);
 
-    // Shown on hover or focus: act on the whole group at once.
+    // Shown on hover or focus: act on the whole group at once. A single
+    // video opens from its card, so it gets no Open all.
     const actions = document.createElement('span');
     actions.className = 'group-actions';
     const label = key || 'Unknown channel';
-    const openAll = document.createElement('button');
-    openAll.className = 'group-action';
-    openAll.dataset.action = 'open';
-    openAll.textContent = `Open all (${list.length})`;
-    openAll.setAttribute('aria-label', `Open all ${list.length} from ${label}`);
-    const clear = document.createElement('button');
-    clear.className = 'group-action';
-    clear.dataset.action = 'clear';
-    clear.textContent = 'Clear group';
-    clear.setAttribute('aria-label', `Remove all ${list.length} from ${label}`);
-    actions.append(openAll, clear);
+    if (list.length > 1) {
+      actions.appendChild(groupAction('open', `Open all (${list.length})`, `Open all ${list.length} from ${label}`,
+        ['M14 3h7v7', 'M10 14 21 3', 'M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5']));
+    }
+    actions.appendChild(groupAction('clear', 'Clear group', `Remove all ${list.length} from ${label}`,
+      ['M3 6h18', 'M8 6V4h8v2', 'M19 6l-1 14H6L5 6']));
 
     header.append(toggle, actions);
 
     group.append(header, ...list.map(video => createCard(video, index++)));
     return group;
   });
+}
+
+// A header button: a small icon and a label.
+function groupAction(action, text, ariaLabel, paths) {
+  const button = document.createElement('button');
+  button.className = `group-action ${action}`;
+  button.dataset.action = action;
+  button.setAttribute('aria-label', ariaLabel);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  for (const [k, v] of Object.entries({ width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) {
+    svg.setAttribute(k, v);
+  }
+  for (const d of paths) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+  }
+  const span = document.createElement('span');
+  span.textContent = text;
+  button.append(svg, span);
+  return button;
 }
 
 /** Collapse or expand a group in place, without redrawing its cards. */
