@@ -408,8 +408,9 @@ body {
 .group-header {
   grid-column: 1 / -1;
   position: sticky;
-  /* Below the page header and, while it shows, the selection bar. */
-  top: calc(var(--header-height, 61px) + var(--selection-bar-height, 0px));
+  /* Below the page header and, while it shows, the selection bar; tucked
+     1px under them so no sliver of the cards shows between. */
+  top: calc(var(--header-height, 61px) + var(--selection-bar-height, 0px) - 1px);
   z-index: 10;
   margin: -8px 0 -8px;
   padding: 8px 0;

@@ -53,12 +53,16 @@ export function channelKey(video) {
 }
 
 // Channel names A to Z: case and accents ignored, "Top 10" before "Top 100".
+// Names starting with a letter come first, then numbers and symbols, then
+// the unknown channel.
+const rank = (key) => (key === '' ? 2 : /^\p{L}/u.test(key) ? 0 : 1);
 const byName = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true }).compare;
 
 /**
  * Split videos (already sorted) into one group per channel. Videos keep their
  * order inside a group. Groups come A to Z, ignoring case and accents, with
- * numbers in number order; the unknown channel ('') always comes last.
+ * numbers in number order; names that start with a number or symbol come
+ * after the letters, and the unknown channel ('') always comes last.
  * @param {object[]} videos
  * @returns {{ key: string, videos: object[] }[]}
  */
@@ -70,7 +74,7 @@ export function groupByChannel(videos) {
     if (!group) groups.set(key, group = { key, videos: [] });
     group.videos.push(video);
   }
-  return [...groups.values()].sort((a, b) => (a.key === '') - (b.key === '') || byName(a.key, b.key));
+  return [...groups.values()].sort((a, b) => rank(a.key) - rank(b.key) || byName(a.key, b.key));
 }
 
 /** Shorts get their own section; everything else is a video. */

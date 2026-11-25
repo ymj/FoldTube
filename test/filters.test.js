@@ -100,9 +100,15 @@ describe('group by channel', () => {
   });
 
   test('A to Z ignores case and accents, and reads numbers as numbers', () => {
-    const names = ['zed', 'Émile', 'Top 100', 'amy', 'Top 9', 'Bob', 'Eve'];
+    const names = ['zed', 'Émile', 'Top 100', 'amy', 'Top 9', 'Bob', 'Eve', '日本'];
     const groups = groupByChannel(names.map((channelName, i) => v(`x${i}`, { channelName })));
-    assert.deepEqual(groups.map(g => g.key), ['amy', 'Bob', 'Émile', 'Eve', 'Top 9', 'Top 100', 'zed']);
+    assert.deepEqual(groups.map(g => g.key), ['amy', 'Bob', 'Émile', 'Eve', 'Top 9', 'Top 100', 'zed', '日本']);
+  });
+
+  test('names starting with a number or symbol come after the letters, before unknown', () => {
+    const names = ['', '@home', 'Bob', '3Blue1Brown', '_under', 'amy', '10 Minute', '2 Minute'];
+    const groups = groupByChannel(names.map((channelName, i) => v(`x${i}`, { channelName })));
+    assert.deepEqual(groups.map(g => g.key), ['amy', 'Bob', '_under', '@home', '2 Minute', '3Blue1Brown', '10 Minute', '']);
   });
 
   test('the Group by menu offers exactly these choices', async () => {
