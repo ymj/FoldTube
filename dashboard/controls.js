@@ -7,9 +7,10 @@ import { isActive } from '../lib/archive.js';
 import { historyItems } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 import { state } from './state.js';
-import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError } from './store.js';
+import { SORT_FIELDS, parseSort } from './filters.js';
+import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError, saveLibraryView } from './store.js';
 import {
-  visibleVideos, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
+  selectableVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
   renderImportResult, refreshEmptyState, updateSelectionBar, setCardSelected,
 } from './render.js';
 
@@ -33,6 +34,130 @@ export function bindControls() {
   bindEmptyState();
   bindHistory();
   bindImportResult();
+  bindStickyOffsets();
+}
+
+// ---- Sort and Group menus ----
+// A button and a menu: arrows move between choices, Enter or a click picks
+// one, Esc or a click elsewhere closes it.
+function bindMenu(name, onPick) {
+  const picker = document.getElementById(`${name}-picker`);
+  const button = document.getElementById(`${name}-button`);
+  const menu = document.getElementById(`${name}-menu`);
+  const items = [...menu.querySelectorAll('[role="menuitemradio"]')];
+
+  const open = () => {
+    menu.classList.remove('hidden');
+    button.setAttribute('aria-expanded', 'true');
+    (items.find(i => i.getAttribute('aria-checked') === 'true') || items[0]).focus();
+  };
+  const close = ({ focusButton = true } = {}) => {
+    if (menu.classList.contains('hidden')) return;
+    menu.classList.add('hidden');
+    button.setAttribute('aria-expanded', 'false');
+    if (focusButton) button.focus();
+  };
+
+  button.addEventListener('click', () => (menu.classList.contains('hidden') ? open() : close()));
+  button.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('[role="menuitemradio"]');
+    if (!item) return;
+    close();
+    if (item.getAttribute('aria-checked') !== 'true') onPick(item.dataset.value);
+  });
+
+  menu.addEventListener('keydown', (e) => {
+    const index = items.indexOf(document.activeElement);
+    const move = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+    if (move) {
+      e.preventDefault();
+      items[(index + move + items.length) % items.length].focus();
+    } else if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      items[e.key === 'Home' ? 0 : items.length - 1].focus();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      close();
+    } else if (e.key === 'Tab') {
+      close({ focusButton: false });
+    }
+  });
+
+  // A click elsewhere only closes the menu, as a native dropdown does: it
+  // doesn't also open the video under it. A click on the other menu's
+  // button still opens that menu.
+  let swallowClick = false;
+  document.addEventListener('pointerdown', (e) => {
+    swallowClick = false;
+    if (menu.classList.contains('hidden') || picker.contains(e.target)) return;
+    close({ focusButton: false });
+    swallowClick = !e.target.closest('.menu-picker');
+  });
+  document.addEventListener('click', (e) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+  // A press that never became a click (a drag) mustn't swallow a later one.
+  document.addEventListener('keydown', () => { swallowClick = false; }, true);
+}
+
+function bindViewMenus() {
+  const view = state.library;
+  const changed = () => { showLibraryView(); renderLibrary(); };
+
+  bindMenu('group', (groupBy) => {
+    view.groupBy = groupBy;
+    changed();
+    saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
+  });
+
+  // A new field starts in its natural direction (newest, shortest, A to Z);
+  // the arrow beside it reverses that.
+  bindMenu('sort', (field) => {
+    view.sort = `${field}-${SORT_FIELDS[field].start}`;
+    changed();
+  });
+  document.getElementById('sort-direction').addEventListener('click', () => {
+    const { field, direction } = parseSort(view.sort);
+    view.sort = `${field}-${direction === 'asc' ? 'desc' : 'asc'}`;
+    changed();
+  });
+}
+
+// Collapsing a group whose header is stuck at the top shrinks the group to
+// above the screen: scroll back so its header stays where it was.
+function keepHeaderInView(group) {
+  const header = group.querySelector('.group-header');
+  const stuckAt = parseFloat(getComputedStyle(header).top) || 0;
+  const top = header.getBoundingClientRect().top;
+  if (top < stuckAt) window.scrollBy(0, top - stuckAt);
+}
+
+// The controls bar sticks below the page header and the selection bar, and
+// channel headers below all three; their heights change with the window
+// width, with what's selected, and when the controls hide (empty library).
+function bindStickyOffsets() {
+  const root = document.documentElement;
+  const header = document.querySelector('.header');
+  const bar = document.getElementById('selection-bar');
+  const controls = document.getElementById('controls-bar');
+  // Exact heights, not rounded: a rounded-down height leaves a strip of the
+  // cards behind showing above a stuck header.
+  const update = () => {
+    root.style.setProperty('--header-height', `${header.getBoundingClientRect().height}px`);
+    root.style.setProperty('--selection-bar-height', `${bar.getBoundingClientRect().height}px`);
+    root.style.setProperty('--controls-height', `${controls.getBoundingClientRect().height}px`);
+  };
+  new ResizeObserver(update).observe(header);
+  new ResizeObserver(update).observe(bar);
+  new ResizeObserver(update).observe(controls);
+  update();
 }
 
 // ---- Theme ----
@@ -62,6 +187,28 @@ export function showSettings() {
   applyTheme(settings.theme);
   document.getElementById('theme-select').value = settings.theme;
   document.getElementById('badge-select').value = settings.badge;
+}
+
+/** Show the Group by and Sort choices on their buttons and in their menus. */
+export function showLibraryView() {
+  showPicked('group', state.library.groupBy);
+  const { field, direction } = parseSort(state.library.sort);
+  showPicked('sort', field);
+  const flip = document.getElementById('sort-direction');
+  const label = SORT_FIELDS[field].label[direction];
+  flip.classList.toggle('ascending', direction === 'asc');
+  flip.setAttribute('aria-label', `Order: ${label}. Click to reverse`);
+  flip.title = label;
+}
+
+// Check the current choice in a menu and show its label on the button.
+function showPicked(name, value) {
+  for (const item of document.querySelectorAll(`#${name}-menu [role="menuitemradio"]`)) {
+    item.setAttribute('aria-checked', String(item.dataset.value === value));
+  }
+  for (const label of document.getElementById(`${name}-button-labels`).children) {
+    label.classList.toggle('current', label.dataset.value === value);
+  }
 }
 
 async function saveAndShowSettings() {
@@ -397,10 +544,7 @@ function bindLibraryControls() {
     renderLibrary();
   }, 150));
 
-  document.getElementById('sort-select').addEventListener('change', (e) => {
-    view.sort = e.target.value;
-    renderLibrary();
-  });
+  bindViewMenus();
 
   document.getElementById('duration-filters').addEventListener('click', (e) => {
     if (!e.target.classList.contains('filter-pill')) return;
@@ -429,6 +573,14 @@ function bindCards() {
     });
 
     grid.addEventListener('click', (e) => {
+      const toggle = e.target.closest('.group-toggle');
+      if (toggle) {
+        const group = toggle.closest('.video-group');
+        setGroupCollapsed(group, !group.classList.contains('collapsed'));
+        keepHeaderInView(group);
+        saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
+        return;
+      }
       const card = e.target.closest('.video-card');
       // Already opening or removing (a double-click): don't do it twice.
       if (!card || card.classList.contains('card-exit')) return;
@@ -469,10 +621,13 @@ function openSingleVideo(video, card) {
 function bindBulkActions() {
   const { selected } = state;
   document.getElementById('btn-select-all').addEventListener('click', () => {
-    visibleVideos().forEach(v => selected.add(v.videoId));
+    selectableVideos().forEach(v => selected.add(v.videoId));
     updateSelectionBar();
-    document.querySelectorAll('.card-checkbox').forEach(cb => cb.checked = true);
-    document.querySelectorAll('.video-card').forEach(c => c.classList.add('selected'));
+    document.querySelectorAll('.video-card').forEach(card => {
+      const on = selected.has(card.dataset.id);
+      card.classList.toggle('selected', on);
+      card.querySelector('.card-checkbox').checked = on;
+    });
   });
 
   document.getElementById('btn-deselect-all').addEventListener('click', () => {

@@ -52,16 +52,65 @@
 
   <div id="controls-bar" class="controls-bar">
     <input type="search" id="search-input" placeholder="Search saved videos..." />
-    <select id="sort-select">
-      <option value="date-desc">Date Saved — Newest first</option>
-      <option value="date-asc">Date Saved — Oldest first</option>
-      <option value="dur-asc">Duration — Shortest first</option>
-      <option value="dur-desc">Duration — Longest first</option>
-      <option value="chan-asc">Channel Name — A → Z</option>
-      <option value="chan-desc">Channel Name — Z → A</option>
-      <option value="title-asc">Title — A → Z</option>
-      <option value="title-desc">Title — Z → A</option>
-    </select>
+    <div class="sort-control">
+      <div class="menu-picker" id="sort-picker">
+        <button type="button" class="picker-button" id="sort-button" aria-haspopup="menu" aria-expanded="false" aria-controls="sort-menu">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="4" y1="12" x2="15" y2="12" />
+            <line x1="4" y1="18" x2="10" y2="18" />
+          </svg>
+          <span class="picker-labels" id="sort-button-labels">
+            <span data-value="date">Date saved</span>
+            <span data-value="dur">Duration</span>
+            <span data-value="title">Title</span>
+          </span>
+        </button>
+        <div class="picker-menu hidden" id="sort-menu" role="menu" aria-label="Sort videos by">
+          <div class="picker-menu-heading" aria-hidden="true">Sort videos by</div>
+          <button type="button" role="menuitemradio" data-value="date">Date saved</button>
+          <button type="button" role="menuitemradio" data-value="dur">Duration</button>
+          <button type="button" role="menuitemradio" data-value="title">Title</button>
+        </div>
+      </div>
+      <button type="button" class="sort-direction" id="sort-direction">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <polyline points="6 13 12 19 18 13" />
+        </svg>
+      </button>
+    </div>
+    <div class="menu-picker" id="group-picker">
+      <button type="button" class="picker-button" id="group-button" aria-haspopup="menu" aria-expanded="false" aria-controls="group-menu">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="12 2 2 7 12 12 22 7 12 2" />
+          <polyline points="2 17 12 22 22 17" />
+          <polyline points="2 12 12 17 22 12" />
+        </svg>
+        <!-- Every label sits in the same spot and only the current one shows,
+             so the button is always as wide as the longest: picking a
+             choice doesn't shift the controls around it. -->
+        <span class="picker-labels" id="group-button-labels">
+          <span data-value="none">Group: None</span>
+          <span data-value="channel-az">Channel: A → Z</span>
+          <span data-value="channel-za">Channel: Z → A</span>
+          <span data-value="channel-recent">Channel: Recent</span>
+          <span data-value="channel-count">Channel: Most videos</span>
+        </span>
+      </button>
+      <div class="picker-menu hidden" id="group-menu" role="menu" aria-label="Group by">
+        <button type="button" role="menuitemradio" data-value="none">No grouping</button>
+        <div class="picker-menu-divider" role="separator"></div>
+        <div class="picker-menu-heading" aria-hidden="true">Group by channel</div>
+        <button type="button" role="menuitemradio" data-value="channel-az" aria-label="Group by channel, A to Z">A → Z</button>
+        <button type="button" role="menuitemradio" data-value="channel-za" aria-label="Group by channel, Z to A">Z → A</button>
+        <button type="button" role="menuitemradio" data-value="channel-recent" aria-label="Group by channel, recently saved first">Recently saved</button>
+        <button type="button" role="menuitemradio" data-value="channel-count" aria-label="Group by channel, most videos first">Most videos</button>
+      </div>
+    </div>
     <div class="duration-filters" id="duration-filters">
       <button class="filter-pill active" data-all="true">All</button>
       <button class="filter-pill" data-min="0" data-max="300">Under 5 min</button>

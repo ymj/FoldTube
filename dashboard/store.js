@@ -6,6 +6,7 @@
 
 import { decodeStored, isActive } from '../lib/archive.js';
 import { badgeMode } from '../lib/badge.js';
+import { GROUP_BY } from './filters.js';
 import { state } from './state.js';
 
 /** Take a new savedVideos value: every record, and the library. */
@@ -54,6 +55,21 @@ export async function loadSettings() {
 
 export function saveSettings() {
   return chrome.storage.local.set({ settings: state.settings });
+}
+
+// How the library is grouped, and which groups are collapsed. Kept apart
+// from settings: the service worker never needs it.
+export async function loadLibraryView() {
+  const { libraryView: saved } = await chrome.storage.local.get('libraryView');
+  if (GROUP_BY.includes(saved?.groupBy)) state.library.groupBy = saved.groupBy;
+  if (Array.isArray(saved?.collapsed)) {
+    state.library.collapsed = new Set(saved.collapsed.filter(k => typeof k === 'string'));
+  }
+}
+
+export function saveLibraryView() {
+  const { groupBy, collapsed } = state.library;
+  return chrome.storage.local.set({ libraryView: { groupBy, collapsed: [...collapsed] } });
 }
 
 export async function readApiError() {

@@ -388,6 +388,100 @@ body {
   display: none !important;
 }
 
+/* Group by channel: a header row across the grid, then that channel's
+   cards. The group spans the grid and shares its columns, so its header can
+   stick to the top while the group scrolls past, then leave with it. */
+.video-group {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+.video-group.collapsed > .video-card {
+  display: none;
+}
+
+.by-channel .video-card .channel {
+  display: none;
+}
+
+.group-header {
+  grid-column: 1 / -1;
+  position: sticky;
+  /* Below the page header and, while it shows, the selection bar; tucked
+     1px under them so no sliver of the cards shows between. */
+  top: calc(var(--header-height, 61px) + var(--selection-bar-height, 0px) + var(--controls-height, 0px) - 2px);
+  z-index: 10;
+  margin: -8px 0 -8px;
+  padding: 8px 0;
+  background-color: var(--bg-color);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.video-group.collapsed .group-header {
+  margin-bottom: 0;
+}
+
+.group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 8px 4px 4px;
+  margin-left: -4px;
+  border: none;
+  border-radius: var(--border-radius);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.group-toggle:hover {
+  background-color: var(--surface-hover);
+}
+
+.group-toggle:focus-visible {
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 1px;
+}
+
+/* A chevron: points down when open, right when collapsed. */
+.group-toggle::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 4px;
+  border-right: 2px solid var(--text-secondary);
+  border-bottom: 2px solid var(--text-secondary);
+  transform: rotate(45deg) translate(-1px, -1px);
+  transition: transform var(--transition-speed);
+}
+
+.video-group.collapsed .group-toggle::before {
+  transform: rotate(-45deg);
+}
+
+.group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-name.unknown {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.group-count {
+  flex: none;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
 /* Shorts Grid */
 .shorts-grid {
   grid-template-columns: repeat(5, 1fr);
@@ -423,14 +517,22 @@ body {
   display: flex;
   gap: 16px;
   align-items: center;
-  padding: 16px 24px 0;
+  padding: 16px 24px 12px;
   max-width: 1400px;
-  margin: 0 auto;
+  margin: 0 auto -12px;
   flex-wrap: wrap;
+  /* Search and filters stay in reach while the library scrolls, below the
+     page header and the selection bar. Same width as the library, so the
+     cards never show past its sides. */
+  position: sticky;
+  top: calc(var(--header-height, 61px) + var(--selection-bar-height, 0px) - 1px);
+  z-index: 98;
+  background-color: var(--bg-color);
 }
 
 #search-input,
-#sort-select {
+.picker-button,
+.sort-direction {
   padding: 8px 36px 8px 12px;
   border-radius: var(--border-radius);
   border: 1px solid var(--border-color);
@@ -443,6 +545,147 @@ body {
 #search-input {
   flex: 1;
   min-width: 200px;
+}
+
+/* Sort and Group: a button that opens a small menu below it. */
+.menu-picker {
+  position: relative;
+}
+
+.picker-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  line-height: normal;
+}
+
+/* Sort: the field button and a direction arrow, joined into one control. */
+.sort-control {
+  display: flex;
+}
+
+.sort-control .picker-button {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.sort-direction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -1px;
+  padding: 8px 12px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sort-direction svg {
+  transition: transform var(--transition-speed);
+}
+
+.sort-direction.ascending svg {
+  transform: rotate(180deg);
+}
+
+.sort-direction:hover,
+.picker-button:hover {
+  position: relative;
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.picker-labels {
+  display: grid;
+  text-align: left;
+}
+
+.picker-labels > span {
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+
+.picker-labels > span.current {
+  visibility: visible;
+}
+
+.picker-button svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.picker-button[aria-expanded="true"] {
+  border-color: var(--text-primary);
+}
+
+.picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 110;
+  min-width: 100%;
+  width: max-content;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--surface-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.picker-menu.hidden {
+  display: none;
+}
+
+.picker-menu [role="menuitemradio"] {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 7px 12px 7px 30px;
+  border: none;
+  border-radius: calc(var(--border-radius) - 2px);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.picker-menu [role="menuitemradio"]:hover,
+.picker-menu [role="menuitemradio"]:focus-visible {
+  background-color: var(--surface-hover);
+  outline: none;
+}
+
+/* A check mark beside the current choice. */
+.picker-menu [aria-checked="true"]::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 4px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.picker-menu-divider {
+  height: 1px;
+  margin: 6px 6px;
+  background-color: var(--border-color);
+}
+
+.picker-menu-heading {
+  padding: 8px 12px 4px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .duration-filters {
@@ -481,7 +724,7 @@ body {
 
 .selection-bar {
   position: sticky;
-  top: 61px;
+  top: var(--header-height, 61px);
   left: 0;
   right: 0;
   background-color: var(--surface-color);
@@ -954,7 +1197,7 @@ body {
 /* Dropdowns: draw our own chevron so it sits clear of the border in every
    browser, in the theme's colors. */
 .theme-select,
-#sort-select {
+.picker-button {
   appearance: none;
   -webkit-appearance: none;
   background-image:
