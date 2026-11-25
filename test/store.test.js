@@ -1,6 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { dashboardFiles } from './helpers.js';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos } from '../lib/store.js';
 import { isActive } from '../lib/archive.js';
 
@@ -171,7 +172,7 @@ describe('createVideoStore (races)', () => {
 });
 
 test('savedVideos is written in exactly one place in the extension', async () => {
-  const files = ['background/service-worker.js', 'dashboard/dashboard.js', 'content/scraper.js', 'lib/youtube.js', 'lib/fold.js', 'lib/store.js'];
+  const files = ['background/service-worker.js', ...await dashboardFiles(), 'content/scraper.js', 'lib/youtube.js', 'lib/fold.js', 'lib/store.js'];
   let count = 0;
   for (const f of files) {
     const src = await readFile(new URL(`../${f}`, import.meta.url), 'utf8');

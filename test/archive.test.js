@@ -222,9 +222,9 @@ describe('backups', () => {
     assert.deepEqual(Object.keys(backup), ['schemaVersion', 'savedVideos']);
     // The dashboard exports exactly this, from the saved list alone.
     const { readFile } = await import('node:fs/promises');
-    const src = await readFile(new URL('../dashboard/dashboard.js', import.meta.url), 'utf8');
-    assert.match(src, /JSON\.stringify\(buildJsonExport\(allRecords\)/);
-    assert.doesNotMatch(src, /buildJsonExport\([^)]*(appSettings|apiKey|settings)/);
+    const src = await readFile(new URL('../dashboard/controls.js', import.meta.url), 'utf8');
+    assert.match(src, /JSON\.stringify\(buildJsonExport\(state\.records\)/);
+    assert.doesNotMatch(src, /buildJsonExport\([^)]*(settings|apiKey)/);
   });
 
   test('HTML export: the library only', () => {
