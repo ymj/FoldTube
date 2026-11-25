@@ -20,6 +20,22 @@ export const SORTS = {
 };
 
 /**
+ * The Sort control: a field, and a direction it flips between. Each field
+ * starts in its natural direction; `label` says what each direction means.
+ */
+export const SORT_FIELDS = {
+  date: { start: 'desc', label: { desc: 'Newest first', asc: 'Oldest first' } },
+  dur: { start: 'asc', label: { asc: 'Shortest first', desc: 'Longest first' } },
+  title: { start: 'asc', label: { asc: 'A to Z', desc: 'Z to A' } },
+};
+
+/** Split a sort ('date-desc') into its field and direction. */
+export function parseSort(sort) {
+  const [field, direction] = String(sort).split('-');
+  return SORT_FIELDS[field] && SORT_FIELDS[field].label[direction] ? { field, direction } : { field: 'date', direction: 'desc' };
+}
+
+/**
  * True when a video's length is in the range. An unknown length counts as 0.
  * @param {object} video
  * @param {{ min: number, max: number } | null} range min included, max not; null matches all

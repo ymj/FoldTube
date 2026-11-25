@@ -531,8 +531,8 @@ body {
 }
 
 #search-input,
-#sort-select,
-.group-button {
+.picker-button,
+.sort-direction {
   padding: 8px 36px 8px 12px;
   border-radius: var(--border-radius);
   border: 1px solid var(--border-color);
@@ -547,12 +547,12 @@ body {
   min-width: 200px;
 }
 
-/* Group by: a button that opens a small menu below it. */
-.group-picker {
+/* Sort and Group: a button that opens a small menu below it. */
+.menu-picker {
   position: relative;
 }
 
-.group-button {
+.picker-button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -560,34 +560,67 @@ body {
   line-height: normal;
 }
 
-.group-button-labels {
+/* Sort: the field button and a direction arrow, joined into one control. */
+.sort-control {
+  display: flex;
+}
+
+.sort-control .picker-button {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.sort-direction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -1px;
+  padding: 8px 12px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sort-direction svg {
+  transition: transform var(--transition-speed);
+}
+
+.sort-direction.ascending svg {
+  transform: rotate(180deg);
+}
+
+.sort-direction:hover,
+.picker-button:hover {
+  position: relative;
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.picker-labels {
   display: grid;
   text-align: left;
 }
 
-.group-button-labels > span {
+.picker-labels > span {
   grid-area: 1 / 1;
   visibility: hidden;
 }
 
-.group-button-labels > span.current {
+.picker-labels > span.current {
   visibility: visible;
 }
 
-.group-button svg {
+.picker-button svg {
   flex: none;
   color: var(--text-secondary);
 }
 
-.group-button:hover {
-  border-color: var(--text-secondary);
-}
-
-.group-button[aria-expanded="true"] {
+.picker-button[aria-expanded="true"] {
   border-color: var(--text-primary);
 }
 
-.group-menu {
+.picker-menu {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -601,11 +634,11 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
-.group-menu.hidden {
+.picker-menu.hidden {
   display: none;
 }
 
-.group-menu [role="menuitemradio"] {
+.picker-menu [role="menuitemradio"] {
   display: flex;
   align-items: center;
   width: 100%;
@@ -621,14 +654,14 @@ body {
   position: relative;
 }
 
-.group-menu [role="menuitemradio"]:hover,
-.group-menu [role="menuitemradio"]:focus-visible {
+.picker-menu [role="menuitemradio"]:hover,
+.picker-menu [role="menuitemradio"]:focus-visible {
   background-color: var(--surface-hover);
   outline: none;
 }
 
 /* A check mark beside the current choice. */
-.group-menu [aria-checked="true"]::before {
+.picker-menu [aria-checked="true"]::before {
   content: "";
   position: absolute;
   left: 12px;
@@ -640,13 +673,13 @@ body {
   transform: translateY(-65%) rotate(45deg);
 }
 
-.group-menu-divider {
+.picker-menu-divider {
   height: 1px;
   margin: 6px 6px;
   background-color: var(--border-color);
 }
 
-.group-menu-heading {
+.picker-menu-heading {
   padding: 8px 12px 4px;
   color: var(--text-secondary);
   font-size: 0.72rem;
@@ -1164,8 +1197,7 @@ body {
 /* Dropdowns: draw our own chevron so it sits clear of the border in every
    browser, in the theme's colors. */
 .theme-select,
-#sort-select,
-.group-button {
+.picker-button {
   appearance: none;
   -webkit-appearance: none;
   background-image:

@@ -7,6 +7,7 @@ import { isActive } from '../lib/archive.js';
 import { historyItems } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 import { state } from './state.js';
+import { SORT_FIELDS, parseSort } from './filters.js';
 import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError, saveLibraryView } from './store.js';
 import {
   selectableVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
@@ -36,12 +37,13 @@ export function bindControls() {
   bindStickyOffsets();
 }
 
-// ---- Group by menu ----
+// ---- Sort and Group menus ----
 // A button and a menu: arrows move between choices, Enter or a click picks
 // one, Esc or a click elsewhere closes it.
-function bindGroupMenu() {
-  const button = document.getElementById('group-button');
-  const menu = document.getElementById('group-menu');
+function bindMenu(name, onPick) {
+  const picker = document.getElementById(`${name}-picker`);
+  const button = document.getElementById(`${name}-button`);
+  const menu = document.getElementById(`${name}-menu`);
   const items = [...menu.querySelectorAll('[role="menuitemradio"]')];
 
   const open = () => {
@@ -65,11 +67,7 @@ function bindGroupMenu() {
     const item = e.target.closest('[role="menuitemradio"]');
     if (!item) return;
     close();
-    if (item.dataset.value === state.library.groupBy) return;
-    state.library.groupBy = item.dataset.value;
-    showLibraryView();
-    renderLibrary();
-    saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
+    if (item.getAttribute('aria-checked') !== 'true') onPick(item.dataset.value);
   });
 
   menu.addEventListener('keydown', (e) => {
@@ -90,13 +88,14 @@ function bindGroupMenu() {
   });
 
   // A click elsewhere only closes the menu, as a native dropdown does: it
-  // doesn't also open the video under it.
+  // doesn't also open the video under it. A click on the other menu's
+  // button still opens that menu.
   let swallowClick = false;
   document.addEventListener('pointerdown', (e) => {
     swallowClick = false;
-    if (menu.classList.contains('hidden') || e.target.closest('#group-picker')) return;
+    if (menu.classList.contains('hidden') || picker.contains(e.target)) return;
     close({ focusButton: false });
-    swallowClick = true;
+    swallowClick = !e.target.closest('.menu-picker');
   });
   document.addEventListener('click', (e) => {
     if (!swallowClick) return;
@@ -106,6 +105,29 @@ function bindGroupMenu() {
   }, true);
   // A press that never became a click (a drag) mustn't swallow a later one.
   document.addEventListener('keydown', () => { swallowClick = false; }, true);
+}
+
+function bindViewMenus() {
+  const view = state.library;
+  const changed = () => { showLibraryView(); renderLibrary(); };
+
+  bindMenu('group', (groupBy) => {
+    view.groupBy = groupBy;
+    changed();
+    saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
+  });
+
+  // A new field starts in its natural direction (newest, shortest, A to Z);
+  // the arrow beside it reverses that.
+  bindMenu('sort', (field) => {
+    view.sort = `${field}-${SORT_FIELDS[field].start}`;
+    changed();
+  });
+  document.getElementById('sort-direction').addEventListener('click', () => {
+    const { field, direction } = parseSort(view.sort);
+    view.sort = `${field}-${direction === 'asc' ? 'desc' : 'asc'}`;
+    changed();
+  });
 }
 
 // Collapsing a group whose header is stuck at the top shrinks the group to
@@ -167,14 +189,25 @@ export function showSettings() {
   document.getElementById('badge-select').value = settings.badge;
 }
 
-/** Show the remembered Group by choice on its button and in its menu. */
+/** Show the Group by and Sort choices on their buttons and in their menus. */
 export function showLibraryView() {
-  const current = state.library.groupBy;
-  for (const item of document.querySelectorAll('#group-menu [role="menuitemradio"]')) {
-    item.setAttribute('aria-checked', String(item.dataset.value === current));
+  showPicked('group', state.library.groupBy);
+  const { field, direction } = parseSort(state.library.sort);
+  showPicked('sort', field);
+  const flip = document.getElementById('sort-direction');
+  const label = SORT_FIELDS[field].label[direction];
+  flip.classList.toggle('ascending', direction === 'asc');
+  flip.setAttribute('aria-label', `Order: ${label}. Click to reverse`);
+  flip.title = label;
+}
+
+// Check the current choice in a menu and show its label on the button.
+function showPicked(name, value) {
+  for (const item of document.querySelectorAll(`#${name}-menu [role="menuitemradio"]`)) {
+    item.setAttribute('aria-checked', String(item.dataset.value === value));
   }
-  for (const label of document.getElementById('group-button-labels').children) {
-    label.classList.toggle('current', label.dataset.value === current);
+  for (const label of document.getElementById(`${name}-button-labels`).children) {
+    label.classList.toggle('current', label.dataset.value === value);
   }
 }
 
@@ -511,12 +544,7 @@ function bindLibraryControls() {
     renderLibrary();
   }, 150));
 
-  document.getElementById('sort-select').addEventListener('change', (e) => {
-    view.sort = e.target.value;
-    renderLibrary();
-  });
-
-  bindGroupMenu();
+  bindViewMenus();
 
   document.getElementById('duration-filters').addEventListener('click', (e) => {
     if (!e.target.classList.contains('filter-pill')) return;

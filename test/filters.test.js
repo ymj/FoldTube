@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, groupByChannel, GROUP_BY, SORTS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, GROUP_BY, SORT_FIELDS, SORTS } from '../dashboard/filters.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -128,12 +128,28 @@ describe('group by channel', () => {
   test('the Group by menu offers exactly these choices', async () => {
     assert.deepEqual(GROUP_BY, ['none', 'channel-az', 'channel-za', 'channel-recent', 'channel-count']);
     const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
-    const menu = html.match(/<div class="group-menu[\s\S]*?\n {4}<\/div>/)?.[0] ?? '';
+    const menu = html.match(/<div class="picker-menu hidden" id="group-menu[\s\S]*?\n {4}<\/div>/)?.[0] ?? '';
     assert.deepEqual([...menu.matchAll(/data-value="([\w-]+)"/g)].map(m => m[1]), GROUP_BY);
-    const labels = html.match(/<span class="group-button-labels"[\s\S]*?<\/span>\s*<\/span>/)?.[0] ?? '';
+    const labels = html.match(/<span class="picker-labels" id="group-button-labels"[\s\S]*?<\/span>\s*<\/span>/)?.[0] ?? '';
     assert.deepEqual([...labels.matchAll(/data-value="([\w-]+)"/g)].map(m => m[1]), GROUP_BY, 'a button label for every choice');
-    const sort = html.match(/<select id="sort-select"[\s\S]*?<\/select>/)?.[0] ?? '';
-    assert.deepEqual([...sort.matchAll(/value="([\w-]+)"/g)].map(m => m[1]), Object.keys(SORTS), 'Sort menu matches SORTS; no channel sort');
+  });
+
+  test('the Sort menu: every field, both directions, is a sort; nothing else is', async () => {
+    const pairs = Object.entries(SORT_FIELDS).flatMap(([field, f]) => Object.keys(f.label).map(d => `${field}-${d}`));
+    assert.deepEqual(pairs.sort(), Object.keys(SORTS).sort());
+    for (const [field, f] of Object.entries(SORT_FIELDS)) assert.ok(f.label[f.start], field);
+    const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
+    const menu = html.match(/<div class="picker-menu hidden" id="sort-menu[\s\S]*?\n {8}<\/div>/)?.[0] ?? '';
+    assert.deepEqual([...menu.matchAll(/data-value="(\w+)"/g)].map(m => m[1]), Object.keys(SORT_FIELDS));
+    const labels = html.match(/<span class="picker-labels" id="sort-button-labels"[\s\S]*?<\/span>\s*<\/span>/)?.[0] ?? '';
+    assert.deepEqual([...labels.matchAll(/data-value="(\w+)"/g)].map(m => m[1]), Object.keys(SORT_FIELDS));
+  });
+
+  test('parseSort: field and direction, or newest first when unknown', () => {
+    assert.deepEqual(parseSort('dur-desc'), { field: 'dur', direction: 'desc' });
+    assert.deepEqual(parseSort('title-asc'), { field: 'title', direction: 'asc' });
+    assert.deepEqual(parseSort('chan-asc'), { field: 'date', direction: 'desc' });
+    assert.deepEqual(parseSort(undefined), { field: 'date', direction: 'desc' });
   });
 
   test('500 videos from 150 channels group quickly', () => {
