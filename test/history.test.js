@@ -1,6 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { dashboardFiles } from './helpers.js';
 import { applyVideoOp } from '../lib/store.js';
 import { purgeExpired, daysLeft, tombstone, isActive, isArchived, isBackInLibrary, ARCHIVE_DAYS } from '../lib/archive.js';
 import { historyItems, groupByDay, dayLabel, expiryLabel, matchesSearch } from '../lib/history.js';
@@ -54,7 +55,7 @@ describe('opening and removing change state', () => {
   });
 
   test('no part of the extension asks to remove records', async () => {
-    for (const f of ['dashboard/dashboard.js', 'background/service-worker.js']) {
+    for (const f of [...await dashboardFiles(), 'background/service-worker.js']) {
       const src = await readFile(new URL(`../${f}`, import.meta.url), 'utf8');
       assert.doesNotMatch(src, /type: ['"](remove|restore)['"]/, f);
     }
