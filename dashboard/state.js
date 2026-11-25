@@ -16,6 +16,9 @@ export const state = {
     query: '', // lower-cased
     sort: 'date-desc',
     duration: null, // { min, max } in seconds, or null for any length
+    // Remembered between visits:
+    groupBy: 'none', // 'none' | 'channel'
+    collapsed: new Set(), // collapsed groups, as "<section>:<channel>"
   },
 
   history: {

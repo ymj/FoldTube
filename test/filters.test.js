@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, SORTS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, splitByType, groupByChannel, GROUP_BY, SORTS } from '../dashboard/filters.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -59,6 +59,65 @@ describe('library view', () => {
     const { standard, shorts } = splitByType([v('a'), v('s1', { videoType: 'short' }), v('b', { videoType: 'video' }), v('s2', { videoType: 'short' })]);
     assert.deepEqual(ids(standard), ['a', 'b']);
     assert.deepEqual(ids(shorts), ['s1', 's2']);
+  });
+});
+
+describe('group by channel', () => {
+  const at = (day) => `2026-11-${String(day).padStart(2, '0')}T00:00:00.000Z`;
+  const library = [
+    v('a1', { channelName: 'Amy', dateSaved: at(1), durationSeconds: 50 }),
+    v('b1', { channelName: 'Bob', dateSaved: at(5), durationSeconds: 10 }),
+    v('a2', { channelName: 'Amy', dateSaved: at(9), durationSeconds: 30 }),
+    v('u1', { channelName: '', dateSaved: at(20) }),
+    v('u2', { channelName: undefined, dateSaved: at(2) }),
+    v('c1', { channelName: '  Cat ', dateSaved: at(3) }),
+    v('c2', { channelName: 'Cat', dateSaved: at(4) }),
+  ];
+  const shape = (groups) => groups.map(g => [g.key, ids(g.videos)]);
+
+  test('one group per channel, newest saved video first; unknown last', () => {
+    assert.deepEqual(shape(groupByChannel(libraryView(library))), [
+      ['Amy', ['a2', 'a1']],
+      ['Bob', ['b1']],
+      ['Cat', ['c2', 'c1']],
+      ['', ['u1', 'u2']],
+    ]);
+  });
+
+  test('Sort orders the videos inside each group, not the groups', () => {
+    assert.deepEqual(shape(groupByChannel(libraryView(library, { sort: 'dur-asc' }))), [
+      ['Amy', ['a2', 'a1']],
+      ['Bob', ['b1']],
+      ['Cat', ['c1', 'c2']],
+      ['', ['u1', 'u2']],
+    ]);
+  });
+
+  test('search and filters apply first: groups come from what is left', () => {
+    assert.deepEqual(shape(groupByChannel(libraryView(library, { query: 'bob' }))), [['Bob', ['b1']]]);
+    assert.deepEqual(shape(groupByChannel(libraryView(library, { duration: { min: 20, max: 60 } }))), [['Amy', ['a2', 'a1']]]);
+    assert.deepEqual(groupByChannel([]), []);
+  });
+
+  test('same newest date: by name; unknown dates sort after known ones', () => {
+    const tie = [v('z', { channelName: 'Zed', dateSaved: at(1) }), v('y', { channelName: 'Yan', dateSaved: at(1) }), v('n', { channelName: 'Nod', dateSaved: 'nope' })];
+    assert.deepEqual(groupByChannel(tie).map(g => g.key), ['Yan', 'Zed', 'Nod']);
+  });
+
+  test('the Group by menu offers exactly these choices', async () => {
+    assert.deepEqual(GROUP_BY, ['none', 'channel']);
+    const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
+    const select = html.match(/<select id="group-select"[\s\S]*?<\/select>/)?.[0] ?? '';
+    assert.deepEqual([...select.matchAll(/value="(\w+)"/g)].map(m => m[1]), GROUP_BY);
+  });
+
+  test('500 videos from 150 channels group quickly', () => {
+    const many = Array.from({ length: 500 }, (_, i) => v(`v${i}`, { channelName: `Channel ${i % 150}`, dateSaved: new Date(Date.UTC(2026, 0, 1) + i * 3600000).toISOString() }));
+    const start = performance.now();
+    const groups = groupByChannel(libraryView(many, { query: 'title' }));
+    assert.equal(groups.length, 150);
+    assert.equal(groups.reduce((n, g) => n + g.videos.length, 0), 500);
+    assert.ok(performance.now() - start < 50, 'under 50 ms');
   });
 });
 

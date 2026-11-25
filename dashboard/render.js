@@ -7,12 +7,28 @@
 import { thumbnailUrlFor, isYouTubeUrl, resumeSeconds, formatDuration, YOUTUBE_TAB_PATTERNS, countFoldableTabs } from '../lib/youtube.js';
 import { isBackInLibrary, daysLeft } from '../lib/archive.js';
 import { matchesSearch, historyItems, groupByDay, expiryLabel, HISTORY_FILTERS } from '../lib/history.js';
-import { libraryView, splitByType } from './filters.js';
+import { libraryView, splitByType, groupByChannel, channelKey } from './filters.js';
 import { state } from './state.js';
 
 /** The library as the grid shows it right now. */
 export function visibleVideos() {
   return libraryView(state.videos, state.library);
+}
+
+/** A group's id: Videos and Shorts collapse separately. */
+export function groupId(section, key) {
+  return `${section}:${key}`;
+}
+
+function sectionOf(video) {
+  return video.videoType === 'short' ? 'shorts' : 'videos';
+}
+
+/** The videos Select all picks: what's on screen, not in collapsed groups. */
+export function selectableVideos() {
+  const videos = visibleVideos();
+  if (state.library.groupBy !== 'channel') return videos;
+  return videos.filter(v => !state.library.collapsed.has(groupId(sectionOf(v), channelKey(v))));
 }
 
 // ---- Skeleton loader ----
@@ -91,13 +107,53 @@ export function renderLibrary() {
     const { standard, shorts } = splitByType(videos);
     videosSection.classList.toggle('hidden', standard.length === 0);
     shortsSection.classList.toggle('hidden', shorts.length === 0);
-    videoGrid.replaceChildren(...standard.map(createCard));
-    shortsGrid.replaceChildren(...shorts.map(createCard));
+    videoGrid.replaceChildren(...sectionContent('videos', standard));
+    shortsGrid.replaceChildren(...sectionContent('shorts', shorts));
   } catch (err) {
     console.error('Render error:', err);
     // Still on the loading placeholders: say so rather than load forever.
     if (document.querySelector('#video-grid .skeleton-card')) showLoadFailed();
   }
+}
+
+// The cards of one section, or with Group by channel, a group per channel:
+// a header, then its cards.
+function sectionContent(section, videos) {
+  if (state.library.groupBy !== 'channel') return videos.map(createCard);
+  let index = 0;
+  return groupByChannel(videos).map(({ key, videos: list }) => {
+    const id = groupId(section, key);
+    const collapsed = state.library.collapsed.has(id);
+    const group = document.createElement('div');
+    group.className = collapsed ? 'video-group collapsed' : 'video-group';
+    group.dataset.group = id;
+
+    const header = document.createElement('h3');
+    header.className = 'group-header';
+    const toggle = document.createElement('button');
+    toggle.className = 'group-toggle';
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    const name = document.createElement('span');
+    name.className = key ? 'group-name' : 'group-name unknown';
+    name.textContent = key || 'Unknown channel';
+    name.title = name.textContent;
+    const count = document.createElement('span');
+    count.className = 'group-count';
+    count.textContent = `· ${list.length}`;
+    toggle.append(name, count);
+    header.appendChild(toggle);
+
+    group.append(header, ...list.map(video => createCard(video, index++)));
+    return group;
+  });
+}
+
+/** Collapse or expand a group in place, without redrawing its cards. */
+export function setGroupCollapsed(group, collapsed) {
+  group.classList.toggle('collapsed', collapsed);
+  group.querySelector('.group-toggle').setAttribute('aria-expanded', String(!collapsed));
+  if (collapsed) state.library.collapsed.add(group.dataset.group);
+  else state.library.collapsed.delete(group.dataset.group);
 }
 
 /** Tick or untick a card, keeping the selection and the bar in step. */

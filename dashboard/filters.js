@@ -44,6 +44,36 @@ export function libraryView(videos, { query = '', duration = null, sort = 'date-
   return compare ? list.sort(compare) : list;
 }
 
+/** The Group by menu's choices. */
+export const GROUP_BY = ['none', 'channel'];
+
+/** The group a video belongs to: its channel name, or '' when unknown. */
+export function channelKey(video) {
+  return typeof video.channelName === 'string' ? video.channelName.trim() : '';
+}
+
+/**
+ * Split videos (already sorted) into one group per channel. Videos keep their
+ * order inside a group. Groups come newest first, by their most recently
+ * saved video; the unknown channel ('') always comes last.
+ * @param {object[]} videos
+ * @returns {{ key: string, videos: object[] }[]}
+ */
+export function groupByChannel(videos) {
+  const groups = new Map();
+  for (const video of videos) {
+    const key = channelKey(video);
+    let group = groups.get(key);
+    if (!group) groups.set(key, group = { key, videos: [], newest: -Infinity });
+    group.videos.push(video);
+    const saved = Date.parse(video.dateSaved);
+    if (saved > group.newest) group.newest = saved;
+  }
+  return [...groups.values()]
+    .sort((a, b) => (a.key === '') - (b.key === '') || (b.newest - a.newest) || a.key.localeCompare(b.key))
+    .map(({ key, videos: list }) => ({ key, videos: list }));
+}
+
 /** Shorts get their own section; everything else is a video. */
 export function splitByType(videos) {
   const standard = [];

@@ -388,6 +388,86 @@ body {
   display: none !important;
 }
 
+/* Group by channel: a header row across the grid, then that channel's
+   cards. The group itself adds no box, so its cards stay in the grid. */
+.video-group {
+  display: contents;
+}
+
+.video-group.collapsed > .video-card {
+  display: none;
+}
+
+.group-header {
+  grid-column: 1 / -1;
+  margin: 8px 0 -8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.video-group:first-child .group-header {
+  margin-top: 0;
+}
+
+.group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 8px 4px 4px;
+  margin-left: -4px;
+  border: none;
+  border-radius: var(--border-radius);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.group-toggle:hover {
+  background-color: var(--surface-hover);
+}
+
+.group-toggle:focus-visible {
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 1px;
+}
+
+/* A chevron: points down when open, right when collapsed. */
+.group-toggle::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 4px;
+  border-right: 2px solid var(--text-secondary);
+  border-bottom: 2px solid var(--text-secondary);
+  transform: rotate(45deg) translate(-1px, -1px);
+  transition: transform var(--transition-speed);
+}
+
+.video-group.collapsed .group-toggle::before {
+  transform: rotate(-45deg);
+}
+
+.group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-name.unknown {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.group-count {
+  flex: none;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
 /* Shorts Grid */
 .shorts-grid {
   grid-template-columns: repeat(5, 1fr);
@@ -430,7 +510,8 @@ body {
 }
 
 #search-input,
-#sort-select {
+#sort-select,
+#group-select {
   padding: 8px 36px 8px 12px;
   border-radius: var(--border-radius);
   border: 1px solid var(--border-color);
@@ -954,7 +1035,8 @@ body {
 /* Dropdowns: draw our own chevron so it sits clear of the border in every
    browser, in the theme's colors. */
 .theme-select,
-#sort-select {
+#sort-select,
+#group-select {
   appearance: none;
   -webkit-appearance: none;
   background-image:

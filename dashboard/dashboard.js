@@ -8,9 +8,9 @@
 //   controls.js everything the user clicks or types
 
 import { state } from './state.js';
-import { setRecords, loadLibrary, loadSettings, changeVideos, readApiError } from './store.js';
+import { setRecords, loadLibrary, loadSettings, loadLibraryView, changeVideos, readApiError } from './store.js';
 import { showSkeletons, showLoadFailed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons } from './render.js';
-import { bindControls, showSettings, applyTheme, showApiError, readShortcutRows, fillShortcutRefs } from './controls.js';
+import { bindControls, showSettings, showLibraryView, applyTheme, showApiError, readShortcutRows, fillShortcutRefs } from './controls.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   init();
@@ -33,8 +33,9 @@ async function focusThisTab() {
 }
 
 async function init() {
-  await loadSettings();
+  await Promise.all([loadSettings(), loadLibraryView()]);
   showSettings();
+  showLibraryView();
   bindControls();
   readShortcutRows().then(fillShortcutRefs);
   showSkeletons();

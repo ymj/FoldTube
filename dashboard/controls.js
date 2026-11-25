@@ -7,9 +7,9 @@ import { isActive } from '../lib/archive.js';
 import { historyItems } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 import { state } from './state.js';
-import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError } from './store.js';
+import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError, saveLibraryView } from './store.js';
 import {
-  visibleVideos, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
+  selectableVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
   renderImportResult, refreshEmptyState, updateSelectionBar, setCardSelected,
 } from './render.js';
 
@@ -62,6 +62,11 @@ export function showSettings() {
   applyTheme(settings.theme);
   document.getElementById('theme-select').value = settings.theme;
   document.getElementById('badge-select').value = settings.badge;
+}
+
+/** Put the remembered Group by choice into its menu. */
+export function showLibraryView() {
+  document.getElementById('group-select').value = state.library.groupBy;
 }
 
 async function saveAndShowSettings() {
@@ -402,6 +407,12 @@ function bindLibraryControls() {
     renderLibrary();
   });
 
+  document.getElementById('group-select').addEventListener('change', (e) => {
+    view.groupBy = e.target.value;
+    renderLibrary();
+    saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
+  });
+
   document.getElementById('duration-filters').addEventListener('click', (e) => {
     if (!e.target.classList.contains('filter-pill')) return;
     const isAllPill = e.target.dataset.all === 'true';
@@ -429,6 +440,13 @@ function bindCards() {
     });
 
     grid.addEventListener('click', (e) => {
+      const toggle = e.target.closest('.group-toggle');
+      if (toggle) {
+        const group = toggle.closest('.video-group');
+        setGroupCollapsed(group, !group.classList.contains('collapsed'));
+        saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
+        return;
+      }
       const card = e.target.closest('.video-card');
       // Already opening or removing (a double-click): don't do it twice.
       if (!card || card.classList.contains('card-exit')) return;
@@ -469,10 +487,13 @@ function openSingleVideo(video, card) {
 function bindBulkActions() {
   const { selected } = state;
   document.getElementById('btn-select-all').addEventListener('click', () => {
-    visibleVideos().forEach(v => selected.add(v.videoId));
+    selectableVideos().forEach(v => selected.add(v.videoId));
     updateSelectionBar();
-    document.querySelectorAll('.card-checkbox').forEach(cb => cb.checked = true);
-    document.querySelectorAll('.video-card').forEach(c => c.classList.add('selected'));
+    document.querySelectorAll('.video-card').forEach(card => {
+      const on = selected.has(card.dataset.id);
+      card.classList.toggle('selected', on);
+      card.querySelector('.card-checkbox').checked = on;
+    });
   });
 
   document.getElementById('btn-deselect-all').addEventListener('click', () => {
