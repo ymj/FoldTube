@@ -7,7 +7,6 @@ import { isActive } from '../lib/archive.js';
 import { historyItems } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 import { state } from './state.js';
-import { CHANNEL_SORTS } from './filters.js';
 import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError, saveLibraryView } from './store.js';
 import {
   selectableVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
@@ -35,6 +34,78 @@ export function bindControls() {
   bindHistory();
   bindImportResult();
   bindStickyOffsets();
+}
+
+// ---- Group by menu ----
+// A button and a menu: arrows move between choices, Enter or a click picks
+// one, Esc or a click elsewhere closes it.
+function bindGroupMenu() {
+  const button = document.getElementById('group-button');
+  const menu = document.getElementById('group-menu');
+  const items = [...menu.querySelectorAll('[role="menuitemradio"]')];
+
+  const open = () => {
+    menu.classList.remove('hidden');
+    button.setAttribute('aria-expanded', 'true');
+    (items.find(i => i.getAttribute('aria-checked') === 'true') || items[0]).focus();
+  };
+  const close = ({ focusButton = true } = {}) => {
+    if (menu.classList.contains('hidden')) return;
+    menu.classList.add('hidden');
+    button.setAttribute('aria-expanded', 'false');
+    if (focusButton) button.focus();
+  };
+
+  button.addEventListener('click', () => (menu.classList.contains('hidden') ? open() : close()));
+  button.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('[role="menuitemradio"]');
+    if (!item) return;
+    close();
+    if (item.dataset.value === state.library.groupBy) return;
+    state.library.groupBy = item.dataset.value;
+    showLibraryView();
+    renderLibrary();
+    saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
+  });
+
+  menu.addEventListener('keydown', (e) => {
+    const index = items.indexOf(document.activeElement);
+    const move = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+    if (move) {
+      e.preventDefault();
+      items[(index + move + items.length) % items.length].focus();
+    } else if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      items[e.key === 'Home' ? 0 : items.length - 1].focus();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      close();
+    } else if (e.key === 'Tab') {
+      close({ focusButton: false });
+    }
+  });
+
+  // A click elsewhere only closes the menu, as a native dropdown does: it
+  // doesn't also open the video under it.
+  let swallowClick = false;
+  document.addEventListener('pointerdown', (e) => {
+    swallowClick = false;
+    if (menu.classList.contains('hidden') || e.target.closest('#group-picker')) return;
+    close({ focusButton: false });
+    swallowClick = true;
+  });
+  document.addEventListener('click', (e) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+  // A press that never became a click (a drag) mustn't swallow a later one.
+  document.addEventListener('keydown', () => { swallowClick = false; }, true);
 }
 
 // Collapsing a group whose header is stuck at the top shrinks the group to
@@ -96,24 +167,13 @@ export function showSettings() {
   document.getElementById('badge-select').value = settings.badge;
 }
 
-/** Put the remembered Group by choice into its menu. */
+/** Show the remembered Group by choice on its button and in its menu. */
 export function showLibraryView() {
-  document.getElementById('group-select').value = state.library.groupBy;
-  syncSortChoices();
-}
-
-// Grouped by channel, every video in a group has the same channel: the
-// Channel Name sorts would do nothing, so they're hidden, and a picked one
-// falls back to newest first.
-function syncSortChoices() {
-  const grouped = state.library.groupBy !== 'none';
-  const select = document.getElementById('sort-select');
-  for (const option of select.options) {
-    if (CHANNEL_SORTS.includes(option.value)) option.hidden = option.disabled = grouped;
-  }
-  if (grouped && CHANNEL_SORTS.includes(state.library.sort)) {
-    state.library.sort = 'date-desc';
-    select.value = 'date-desc';
+  const current = state.library.groupBy;
+  for (const item of document.querySelectorAll('#group-menu [role="menuitemradio"]')) {
+    const checked = item.dataset.value === current;
+    item.setAttribute('aria-checked', String(checked));
+    if (checked) document.getElementById('group-button-label').textContent = item.dataset.label;
   }
 }
 
@@ -455,12 +515,7 @@ function bindLibraryControls() {
     renderLibrary();
   });
 
-  document.getElementById('group-select').addEventListener('change', (e) => {
-    view.groupBy = e.target.value;
-    syncSortChoices();
-    renderLibrary();
-    saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
-  });
+  bindGroupMenu();
 
   document.getElementById('duration-filters').addEventListener('click', (e) => {
     if (!e.target.classList.contains('filter-pill')) return;

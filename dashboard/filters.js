@@ -15,8 +15,6 @@ export const SORTS = {
   'date-asc': byDate,
   'dur-asc': byNumber('durationSeconds'),
   'dur-desc': reversed(byNumber('durationSeconds')),
-  'chan-asc': byText('channelName'),
-  'chan-desc': reversed(byText('channelName')),
   'title-asc': byText('title'),
   'title-desc': reversed(byText('title')),
 };
@@ -46,9 +44,6 @@ export function libraryView(videos, { query = '', duration = null, sort = 'date-
 
 /** The Group by menu's choices: no grouping, or by channel in an order. */
 export const GROUP_BY = ['none', 'channel-az', 'channel-za', 'channel-recent', 'channel-count'];
-
-/** Sort choices that mean nothing inside a channel group. */
-export const CHANNEL_SORTS = ['chan-asc', 'chan-desc'];
 
 /** The group a video belongs to: its channel name, or '' when unknown. */
 export function channelKey(video) {

@@ -522,19 +522,17 @@ body {
   margin: 0 auto -12px;
   flex-wrap: wrap;
   /* Search and filters stay in reach while the library scrolls, below the
-     page header and the selection bar. The shadow carries the background
-     out to the window's edges past max-width. */
+     page header and the selection bar. Same width as the library, so the
+     cards never show past its sides. */
   position: sticky;
   top: calc(var(--header-height, 61px) + var(--selection-bar-height, 0px) - 1px);
   z-index: 98;
   background-color: var(--bg-color);
-  box-shadow: 0 0 0 100vmax var(--bg-color);
-  clip-path: inset(0 -100vmax);
 }
 
 #search-input,
 #sort-select,
-#group-select {
+.group-button {
   padding: 8px 36px 8px 12px;
   border-radius: var(--border-radius);
   border: 1px solid var(--border-color);
@@ -547,6 +545,100 @@ body {
 #search-input {
   flex: 1;
   min-width: 200px;
+}
+
+/* Group by: a button that opens a small menu below it. */
+.group-picker {
+  position: relative;
+}
+
+.group-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  line-height: normal;
+}
+
+.group-button svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.group-button:hover {
+  border-color: var(--text-secondary);
+}
+
+.group-button[aria-expanded="true"] {
+  border-color: var(--text-primary);
+}
+
+.group-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 110;
+  min-width: 100%;
+  width: max-content;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--surface-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.group-menu.hidden {
+  display: none;
+}
+
+.group-menu [role="menuitemradio"] {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 7px 12px 7px 30px;
+  border: none;
+  border-radius: calc(var(--border-radius) - 2px);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.group-menu [role="menuitemradio"]:hover,
+.group-menu [role="menuitemradio"]:focus-visible {
+  background-color: var(--surface-hover);
+  outline: none;
+}
+
+/* A check mark beside the current choice. */
+.group-menu [aria-checked="true"]::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 4px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.group-menu-divider {
+  height: 1px;
+  margin: 6px 6px;
+  background-color: var(--border-color);
+}
+
+.group-menu-heading {
+  padding: 8px 12px 4px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .duration-filters {
@@ -1059,7 +1151,7 @@ body {
    browser, in the theme's colors. */
 .theme-select,
 #sort-select,
-#group-select {
+.group-button {
   appearance: none;
   -webkit-appearance: none;
   background-image:

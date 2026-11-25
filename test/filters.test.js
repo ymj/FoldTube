@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, groupByChannel, GROUP_BY, CHANNEL_SORTS, SORTS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, splitByType, groupByChannel, GROUP_BY, SORTS } from '../dashboard/filters.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -26,7 +26,6 @@ describe('library view', () => {
     const expected = {
       'date-desc': ['a', 'c', 'b'], 'date-asc': ['b', 'c', 'a'],
       'dur-asc': ['c', 'a', 'b'], 'dur-desc': ['b', 'a', 'c'],
-      'chan-asc': ['b', 'c', 'a'], 'chan-desc': ['a', 'c', 'b'],
       'title-asc': ['a', 'b', 'c'], 'title-desc': ['c', 'b', 'a'],
     };
     assert.deepEqual(Object.keys(SORTS), Object.keys(expected));
@@ -126,16 +125,13 @@ describe('group by channel', () => {
     assert.deepEqual(groupByChannel(tie, 'channel-recent').map(g => g.key), ['Yan', 'Zed', 'Nod']);
   });
 
-  test('the Channel Name sorts are the ones hidden while grouped', () => {
-    assert.deepEqual(CHANNEL_SORTS.filter(s => s in SORTS), CHANNEL_SORTS);
-    assert.deepEqual(Object.keys(SORTS).filter(s => s.startsWith('chan-')), CHANNEL_SORTS);
-  });
-
   test('the Group by menu offers exactly these choices', async () => {
     assert.deepEqual(GROUP_BY, ['none', 'channel-az', 'channel-za', 'channel-recent', 'channel-count']);
     const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
-    const select = html.match(/<select id="group-select"[\s\S]*?<\/select>/)?.[0] ?? '';
-    assert.deepEqual([...select.matchAll(/value="([\w-]+)"/g)].map(m => m[1]), GROUP_BY);
+    const menu = html.match(/<div class="group-menu[\s\S]*?\n {4}<\/div>/)?.[0] ?? '';
+    assert.deepEqual([...menu.matchAll(/data-value="([\w-]+)"/g)].map(m => m[1]), GROUP_BY);
+    const sort = html.match(/<select id="sort-select"[\s\S]*?<\/select>/)?.[0] ?? '';
+    assert.deepEqual([...sort.matchAll(/value="([\w-]+)"/g)].map(m => m[1]), Object.keys(SORTS), 'Sort menu matches SORTS; no channel sort');
   });
 
   test('500 videos from 150 channels group quickly', () => {
