@@ -562,6 +562,7 @@ body {
 
 .group-button-labels {
   display: grid;
+  text-align: left;
 }
 
 .group-button-labels > span {
