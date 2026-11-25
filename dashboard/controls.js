@@ -13,7 +13,7 @@ import {
   renderImportResult, refreshEmptyState, updateSelectionBar, setCardSelected,
 } from './render.js';
 
-export function debounce(fn, delay) {
+function debounce(fn, delay) {
   let t;
   return (...args) => {
     clearTimeout(t);
@@ -430,7 +430,9 @@ function bindCards() {
 
     grid.addEventListener('click', (e) => {
       const card = e.target.closest('.video-card');
-      const video = card && state.videos.find(v => v.videoId === card.dataset.id);
+      // Already opening or removing (a double-click): don't do it twice.
+      if (!card || card.classList.contains('card-exit')) return;
+      const video = state.videos.find(v => v.videoId === card.dataset.id);
       if (!video) return;
       if (e.target.classList.contains('channel') || e.target.classList.contains('card-checkbox')) return;
       if (e.target.classList.contains('delete-btn')) {
@@ -644,7 +646,8 @@ function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  // Firefox may start the download after click() returns: free it later.
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 function today() {

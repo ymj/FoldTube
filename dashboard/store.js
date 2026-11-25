@@ -47,7 +47,8 @@ export function unarchiveVideos(archived) {
 
 export async function loadSettings() {
   const { settings } = await chrome.storage.local.get('settings');
-  if (settings) state.settings = { ...state.settings, ...settings };
+  // In place: controls keep a reference to this object.
+  if (settings) Object.assign(state.settings, settings);
   state.settings.badge = badgeMode(state.settings);
 }
 

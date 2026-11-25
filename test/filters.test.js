@@ -65,9 +65,14 @@ describe('library view', () => {
 describe('dashboard modules', () => {
   test('the page loads one module; the rest are imported', async () => {
     const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
-    const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
-    assert.deepEqual(scripts.map(m => m[1].trim()), ['src="theme-init.js"', 'type="module" src="dashboard.js"']);
-    for (const [, , body] of scripts) assert.equal(body.trim(), '', 'no inline script');
+    const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].map(([, attrs, body]) => ({
+      src: attrs.match(/\bsrc="([^"]+)"/)?.[1],
+      module: /\btype="module"/.test(attrs),
+      body: body.trim(),
+    }));
+    assert.deepEqual(scripts.map(s => s.src), ['theme-init.js', 'dashboard.js']);
+    assert.deepEqual(scripts.filter(s => s.module).map(s => s.src), ['dashboard.js']);
+    for (const s of scripts) assert.equal(s.body, '', 'no inline script');
   });
 
   test('every module is imported by another, and none uses eval', async () => {

@@ -95,6 +95,8 @@ export function renderLibrary() {
     shortsGrid.replaceChildren(...shorts.map(createCard));
   } catch (err) {
     console.error('Render error:', err);
+    // Still on the loading placeholders: say so rather than load forever.
+    if (document.querySelector('#video-grid .skeleton-card')) showLoadFailed();
   }
 }
 
