@@ -560,6 +560,19 @@ body {
   line-height: normal;
 }
 
+.group-button-labels {
+  display: grid;
+}
+
+.group-button-labels > span {
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+
+.group-button-labels > span.current {
+  visibility: visible;
+}
+
 .group-button svg {
   flex: none;
   color: var(--text-secondary);

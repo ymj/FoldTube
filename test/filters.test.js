@@ -130,6 +130,8 @@ describe('group by channel', () => {
     const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
     const menu = html.match(/<div class="group-menu[\s\S]*?\n {4}<\/div>/)?.[0] ?? '';
     assert.deepEqual([...menu.matchAll(/data-value="([\w-]+)"/g)].map(m => m[1]), GROUP_BY);
+    const labels = html.match(/<span class="group-button-labels"[\s\S]*?<\/span>\s*<\/span>/)?.[0] ?? '';
+    assert.deepEqual([...labels.matchAll(/data-value="([\w-]+)"/g)].map(m => m[1]), GROUP_BY, 'a button label for every choice');
     const sort = html.match(/<select id="sort-select"[\s\S]*?<\/select>/)?.[0] ?? '';
     assert.deepEqual([...sort.matchAll(/value="([\w-]+)"/g)].map(m => m[1]), Object.keys(SORTS), 'Sort menu matches SORTS; no channel sort');
   });

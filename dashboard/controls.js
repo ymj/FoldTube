@@ -171,9 +171,10 @@ export function showSettings() {
 export function showLibraryView() {
   const current = state.library.groupBy;
   for (const item of document.querySelectorAll('#group-menu [role="menuitemradio"]')) {
-    const checked = item.dataset.value === current;
-    item.setAttribute('aria-checked', String(checked));
-    if (checked) document.getElementById('group-button-label').textContent = item.dataset.label;
+    item.setAttribute('aria-checked', String(item.dataset.value === current));
+  }
+  for (const label of document.getElementById('group-button-labels').children) {
+    label.classList.toggle('current', label.dataset.value === current);
   }
 }
 
