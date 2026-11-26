@@ -6,7 +6,7 @@
 
 import { decodeStored, isActive } from '../lib/archive.js';
 import { badgeMode } from '../lib/badge.js';
-import { GROUP_BY } from './filters.js';
+import { GROUP_BY, liveCollapsed } from './filters.js';
 import { state } from './state.js';
 
 /** Take a new savedVideos value: every record, and the library. */
@@ -63,13 +63,16 @@ export async function loadLibraryView() {
   const { libraryView: saved } = await chrome.storage.local.get('libraryView');
   if (GROUP_BY.includes(saved?.groupBy)) state.library.groupBy = saved.groupBy;
   if (Array.isArray(saved?.collapsed)) {
-    state.library.collapsed = new Set(saved.collapsed.filter(k => typeof k === 'string'));
+    // Only current ids: collapsed groups from before Videos and Shorts were
+    // grouped together are dropped.
+    state.library.collapsed = new Set(saved.collapsed.filter(k => typeof k === 'string' && k.startsWith('channel:')));
   }
 }
 
 export function saveLibraryView() {
   const { groupBy, collapsed } = state.library;
-  return chrome.storage.local.set({ libraryView: { groupBy, collapsed: [...collapsed] } });
+  // Channels no longer in the library don't need remembering.
+  return chrome.storage.local.set({ libraryView: { groupBy, collapsed: liveCollapsed(collapsed, state.videos) } });
 }
 
 export async function readApiError() {

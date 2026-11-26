@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, channelInitial, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS } from '../dashboard/filters.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -162,6 +162,27 @@ describe('group by channel', () => {
     assert.deepEqual(shape(groups), [['Amy', ['as', 'a1']], ['Bob', ['bs']]]);
     const { standard, shorts } = splitByType(groups[0].videos);
     assert.deepEqual([ids(standard), ids(shorts)], [['a1'], ['as']]);
+  });
+
+  test('a group is the whole channel: its Shorts share its id', () => {
+    const mixed = [v('a1', { channelName: 'Amy' }), v('as', { channelName: ' Amy ', videoType: 'short' }), v('b1', { channelName: 'Bob' }), v('u1', { channelName: '' })];
+    assert.equal(groupId('Amy'), 'channel:Amy');
+    assert.deepEqual(ids(videosInGroup(mixed, groupId('Amy'))), ['a1', 'as']);
+    assert.deepEqual(ids(videosInGroup(mixed, groupId(''))), ['u1']);
+    assert.deepEqual(videosInGroup(mixed, 'videos:Amy'), [], 'old per-section ids match nothing');
+  });
+
+  test('Select all skips collapsed groups, Shorts included; ungrouped, it takes everything', () => {
+    const mixed = [v('a1', { channelName: 'Amy' }), v('as', { channelName: 'Amy', videoType: 'short' }), v('b1', { channelName: 'Bob' })];
+    const collapsed = new Set([groupId('Amy')]);
+    assert.deepEqual(ids(selectableIn(mixed, 'channel-az', collapsed)), ['b1']);
+    assert.deepEqual(ids(selectableIn(mixed, 'none', collapsed)), ['a1', 'as', 'b1']);
+  });
+
+  test('collapsed groups kept: current ids of channels still in the library', () => {
+    const library = [v('a1', { channelName: 'Amy' }), v('u1', { channelName: '' })];
+    const saved = new Set(['channel:Amy', 'channel:Gone', 'videos:Amy', 'shorts:Amy', 'channel:']);
+    assert.deepEqual(liveCollapsed(saved, library), ['channel:Amy', 'channel:']);
   });
 
   test('500 videos from 150 channels group quickly', () => {

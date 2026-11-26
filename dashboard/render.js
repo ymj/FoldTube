@@ -7,7 +7,7 @@
 import { thumbnailUrlFor, isYouTubeUrl, resumeSeconds, formatDuration, YOUTUBE_TAB_PATTERNS, countFoldableTabs } from '../lib/youtube.js';
 import { isBackInLibrary, daysLeft } from '../lib/archive.js';
 import { matchesSearch, historyItems, groupByDay, expiryLabel, HISTORY_FILTERS } from '../lib/history.js';
-import { libraryView, splitByType, groupByChannel, channelKey } from './filters.js';
+import { libraryView, splitByType, groupByChannel, groupId, videosInGroup, selectableIn } from './filters.js';
 import { renderRail } from './rail.js';
 import { state } from './state.js';
 
@@ -16,21 +16,14 @@ export function visibleVideos() {
   return libraryView(state.videos, state.library);
 }
 
-/** A channel group's id, as kept in the collapsed set. */
-export function groupId(key) {
-  return `channel:${key}`;
-}
-
 /** A group's videos and Shorts as the grid shows them (searched and filtered), collapsed or not. */
 export function groupVideos(id) {
-  return visibleVideos().filter(v => groupId(channelKey(v)) === id);
+  return videosInGroup(visibleVideos(), id);
 }
 
 /** The videos Select all picks: what's on screen, not in collapsed groups. */
 export function selectableVideos() {
-  const videos = visibleVideos();
-  if (state.library.groupBy === 'none') return videos;
-  return videos.filter(v => !state.library.collapsed.has(groupId(channelKey(v))));
+  return selectableIn(visibleVideos(), state.library.groupBy, state.library.collapsed);
 }
 
 // ---- Skeleton loader ----
@@ -72,6 +65,7 @@ export function renderLibrary() {
     const shortsGrid = document.getElementById('shorts-grid');
     const videosSection = document.getElementById('videos-section');
     const shortsSection = document.getElementById('shorts-section');
+    const videosTitle = videosSection.querySelector('.section-title');
     const emptyState = document.getElementById('empty-state');
     const noResults = document.getElementById('no-results');
     const videoCount = document.querySelector('.video-count');
@@ -115,6 +109,9 @@ export function renderLibrary() {
       const groups = groupByChannel(videos, state.library.groupBy);
       videosSection.classList.remove('hidden');
       shortsSection.classList.add('hidden');
+      // One section holds both now: say what's in it.
+      const { standard, shorts } = splitByType(videos);
+      videosTitle.textContent = !standard.length ? 'Shorts' : shorts.length ? 'Videos and Shorts' : 'Videos';
       videoGrid.replaceChildren(...channelGroups(groups));
       shortsGrid.replaceChildren();
       updateCollapseAll();
@@ -122,6 +119,7 @@ export function renderLibrary() {
       return;
     }
     const { standard, shorts } = splitByType(videos);
+    videosTitle.textContent = 'Videos';
     videosSection.classList.toggle('hidden', standard.length === 0);
     shortsSection.classList.toggle('hidden', shorts.length === 0);
     videoGrid.replaceChildren(...standard.map((video, i) => createCard(video, i)));
@@ -211,12 +209,12 @@ function groupAction(action, text, ariaLabel, paths) {
 }
 
 /** Collapse or expand a group in place, without redrawing its cards. */
-export function setGroupCollapsed(group, collapsed) {
+export function setGroupCollapsed(group, collapsed, { updateButton = true } = {}) {
   group.classList.toggle('collapsed', collapsed);
   group.querySelector('.group-toggle').setAttribute('aria-expanded', String(!collapsed));
   if (collapsed) state.library.collapsed.add(group.dataset.group);
   else state.library.collapsed.delete(group.dataset.group);
-  updateCollapseAll();
+  if (updateButton) updateCollapseAll();
 }
 
 /** Collapse all, or Expand all once every group is collapsed; only with 2+ groups. */

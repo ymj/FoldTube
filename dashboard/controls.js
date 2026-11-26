@@ -11,7 +11,7 @@ import { state } from './state.js';
 import { SORT_FIELDS, parseSort } from './filters.js';
 import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError, saveLibraryView } from './store.js';
 import {
-  selectableVideos, groupVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
+  selectableVideos, groupVideos, setGroupCollapsed, updateCollapseAll, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
   renderImportResult, refreshEmptyState, updateSelectionBar, setCardSelected,
 } from './render.js';
 
@@ -152,7 +152,8 @@ function bindCollapseAll() {
     const current = groups.find(g => g.getBoundingClientRect().bottom > stuckAt);
     // Its header is stuck, or right at the line (just jumped to).
     const scrolledInto = current && current.getBoundingClientRect().top - 8 <= stuckAt + 1;
-    for (const group of groups) setGroupCollapsed(group, collapse);
+    for (const group of groups) setGroupCollapsed(group, collapse, { updateButton: false });
+    updateCollapseAll();
     if (scrolledInto) {
       // Its header sits 8px above the group: put that at the line.
       window.scrollBy(0, current.getBoundingClientRect().top - 8 - stuckAt);
