@@ -10,7 +10,7 @@ import { state } from './state.js';
 import { SORT_FIELDS, parseSort } from './filters.js';
 import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError, saveLibraryView } from './store.js';
 import {
-  selectableVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
+  selectableVideos, groupVideos, setGroupCollapsed, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
   renderImportResult, refreshEmptyState, updateSelectionBar, setCardSelected,
 } from './render.js';
 
@@ -485,7 +485,7 @@ function bindKeyboard() {
       const typing = active.tagName === 'INPUT' && !(active.id === 'history-search' && !active.value);
       if (state.history.open && !typing) { showHistory(false); return; }
     }
-    if (state.history.open) return;
+    if (state.history.open || document.querySelector('dialog[open]')) return;
     if (e.key === 'Delete' && state.selected.size > 0 && document.activeElement.tagName !== 'INPUT') {
       document.getElementById('btn-delete-selected').click();
     }
@@ -573,6 +573,13 @@ function bindCards() {
     });
 
     grid.addEventListener('click', (e) => {
+      const action = e.target.closest('.group-action');
+      if (action) {
+        const videos = groupVideos(action.closest('.video-group').dataset.group);
+        if (action.dataset.action === 'open') openVideos(videos);
+        else confirmClear(action, videos);
+        return;
+      }
       const toggle = e.target.closest('.group-toggle');
       if (toggle) {
         const group = toggle.closest('.video-group');
@@ -637,31 +644,107 @@ function bindBulkActions() {
     document.querySelectorAll('.video-card').forEach(c => c.classList.remove('selected'));
   });
 
-  document.getElementById('btn-open-selected').addEventListener('click', async () => {
-    if (!selected.size) return;
-    if (selected.size > 10 && !confirm(`This will open ${selected.size} tabs. Continue?`)) return;
-    // Only entries with a YouTube link are opened and removed; others stay saved.
-    const removed = state.videos.filter(v => selected.has(v.videoId) && isYouTubeUrl(v.url));
-    const ids = new Set(removed.map(v => v.videoId));
-    const count = removed.length;
-    if (count === 0) return;
-    removed.forEach(v => chrome.tabs.create({ url: openUrlFor(v), active: false }));
-    selected.clear();
-    updateSelectionBar();
-    const result = await archiveVideos([...ids], 'watched');
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => unarchiveVideos(result));
+  document.getElementById('btn-open-selected').addEventListener('click', () => {
+    openVideos(state.videos.filter(v => selected.has(v.videoId)));
   });
 
-  document.getElementById('btn-delete-selected').addEventListener('click', async () => {
-    if (!selected.size) return;
-    const ids = new Set(selected);
-    const count = ids.size;
-    if (count > 1 && !confirm(`Delete ${count} selected videos?`)) return;
-    selected.clear();
-    updateSelectionBar();
-    const result = await archiveVideos([...ids], 'deleted');
-    showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => unarchiveVideos(result));
+  document.getElementById('btn-delete-selected').addEventListener('click', () => {
+    removeVideos(state.videos.filter(v => selected.has(v.videoId)));
   });
+}
+
+// Opening this many tabs at once asks first: lots of new tabs can bog the
+// browser down.
+const OPEN_ASK_OVER = 5;
+
+// Open videos in new tabs and move them to History as watched, with Undo.
+// Used by Open Selected and a group's Open all.
+async function openVideos(videos) {
+  // Only entries with a YouTube link are opened and removed; others stay saved.
+  const opened = videos.filter(v => isYouTubeUrl(v.url));
+  const count = opened.length;
+  if (count === 0) return;
+  if (count > OPEN_ASK_OVER && !await askToConfirm({
+    title: `Open ${count} videos in new tabs?`,
+    detail: 'Opening many tabs at once can slow your browser down. They move to History as watched, and you can Undo.',
+    ok: `Open ${count} tabs`,
+  })) return;
+  opened.forEach(v => chrome.tabs.create({ url: openUrlFor(v), active: false }));
+  const ids = opened.map(v => v.videoId);
+  deselect(ids);
+  const result = await archiveVideos(ids, 'watched');
+  showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => unarchiveVideos(result));
+}
+
+// Remove videos (to History as deleted), with Undo. Used by Delete Selected,
+// which asks first, and Clear group, which asks on the button itself.
+async function removeVideos(videos, { ask = true } = {}) {
+  const count = videos.length;
+  if (count === 0) return;
+  if (ask && count > 1 && !confirm(`Delete ${count} videos?`)) return;
+  const ids = videos.map(v => v.videoId);
+  deselect(ids);
+  const result = await archiveVideos(ids, 'deleted');
+  showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => unarchiveVideos(result));
+}
+
+/** Ask a yes/no question in a dialog. Resolves true for the OK button. */
+function askToConfirm({ title, detail, ok }) {
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-detail').textContent = detail;
+  const okButton = document.getElementById('btn-confirm-ok');
+  okButton.textContent = ok;
+  return new Promise((resolve) => {
+    const answer = (yes) => () => { modal.close(); resolve(yes); };
+    const onOk = answer(true);
+    const onCancel = answer(false);
+    okButton.addEventListener('click', onOk);
+    document.getElementById('btn-confirm-cancel').addEventListener('click', onCancel);
+    // Esc closes it too: that's a no.
+    modal.addEventListener('close', () => {
+      okButton.removeEventListener('click', onOk);
+      document.getElementById('btn-confirm-cancel').removeEventListener('click', onCancel);
+      resolve(false);
+    }, { once: true });
+    // Cancel has focus first, so Enter alone doesn't open the tabs.
+    modal.showModal();
+    document.getElementById('btn-confirm-cancel').focus();
+  });
+}
+
+// Clear group asks on the button: the first click turns it into "Clear N?",
+// a second click within a few seconds clears. Leaving it, or waiting, resets.
+const CLEAR_CONFIRM_MS = 4000;
+function confirmClear(button, videos) {
+  if (videos.length <= 1 || button.classList.contains('confirming')) {
+    removeVideos(videos, { ask: false });
+    return;
+  }
+  const text = button.querySelector('span');
+  const original = { text: text.textContent, label: button.getAttribute('aria-label') };
+  // Same width while it asks, so Open all beside it doesn't move.
+  button.style.minWidth = `${button.getBoundingClientRect().width}px`;
+  button.classList.add('confirming');
+  text.textContent = `Clear ${videos.length}?`;
+  button.setAttribute('aria-label', `Click again to remove all ${videos.length}`);
+  const reset = () => {
+    clearTimeout(timer);
+    button.classList.remove('confirming');
+    button.style.minWidth = '';
+    text.textContent = original.text;
+    button.setAttribute('aria-label', original.label);
+    button.closest('.group-header')?.removeEventListener('mouseleave', reset);
+    button.removeEventListener('blur', reset);
+  };
+  const timer = setTimeout(reset, CLEAR_CONFIRM_MS);
+  button.closest('.group-header').addEventListener('mouseleave', reset);
+  button.addEventListener('blur', reset);
+}
+
+function deselect(ids) {
+  ids.forEach(id => state.selected.delete(id));
+  updateSelectionBar();
 }
 
 // ---- Empty state ----

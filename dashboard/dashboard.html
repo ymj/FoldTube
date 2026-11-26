@@ -341,6 +341,18 @@
     </div>
   </dialog>
 
+  <!-- Asks before something big, like opening many tabs at once. -->
+  <dialog id="confirm-modal" class="modal import-modal" aria-labelledby="confirm-title" aria-describedby="confirm-detail">
+    <div class="import-body">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-detail" class="import-detail"></p>
+      <div class="import-actions">
+        <button id="btn-confirm-cancel" class="btn-secondary">Cancel</button>
+        <button id="btn-confirm-ok" class="btn-primary"></button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="help-modal" class="modal" aria-labelledby="help-title">
     <div class="modal-content">
       <div class="modal-header">
