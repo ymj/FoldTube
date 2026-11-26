@@ -4,6 +4,7 @@
 
 import { validateImport, buildHtmlExport, buildJsonExport, isYouTubeUrl, openUrlFor } from '../lib/youtube.js';
 import { isActive } from '../lib/archive.js';
+import { bindRail } from './rail.js';
 import { historyItems } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 import { state } from './state.js';
@@ -35,6 +36,8 @@ export function bindControls() {
   bindHistory();
   bindImportResult();
   bindStickyOffsets();
+  bindRail();
+  bindCollapseAll();
 }
 
 // ---- Sort and Group menus ----
@@ -137,6 +140,25 @@ function keepHeaderInView(group) {
   const stuckAt = parseFloat(getComputedStyle(header).top) || 0;
   const top = header.getBoundingClientRect().top;
   if (top < stuckAt) window.scrollBy(0, top - stuckAt);
+}
+
+// Collapse all / Expand all. The channel you're in stays at the top.
+function bindCollapseAll() {
+  document.getElementById('btn-collapse-all').addEventListener('click', () => {
+    const groups = [...document.querySelectorAll('#video-grid > .video-group')];
+    const collapse = groups.some(g => !g.classList.contains('collapsed'));
+    const stuckAt = groups.length ? parseFloat(getComputedStyle(groups[0].querySelector('.group-header')).top) || 0 : 0;
+    // The group you're in: the one passing under the stuck header line.
+    const current = groups.find(g => g.getBoundingClientRect().bottom > stuckAt);
+    // Its header is stuck, or right at the line (just jumped to).
+    const scrolledInto = current && current.getBoundingClientRect().top - 8 <= stuckAt + 1;
+    for (const group of groups) setGroupCollapsed(group, collapse);
+    if (scrolledInto) {
+      // Its header sits 8px above the group: put that at the line.
+      window.scrollBy(0, current.getBoundingClientRect().top - 8 - stuckAt);
+    }
+    saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
+  });
 }
 
 // The controls bar sticks below the page header and the selection bar, and

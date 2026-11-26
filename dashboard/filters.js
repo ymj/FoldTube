@@ -104,10 +104,31 @@ export function groupByChannel(videos, order = 'channel-az') {
     .map(({ key, videos: list }) => ({ key, videos: list }));
 }
 
-/** Shorts get their own section; everything else is a video. */
+/** Shorts apart from everything else: their own section, or row in a channel group. */
 export function splitByType(videos) {
   const standard = [];
   const shorts = [];
   for (const v of videos) (v.videoType === 'short' ? shorts : standard).push(v);
   return { standard, shorts };
+}
+
+// ---- Channel rail ----
+
+/** Most ticks the channel rail shows; with more channels, one stands for several. */
+export const RAIL_MAX_TICKS = 18;
+/** Channels before the rail's list gets a filter box. */
+export const RAIL_FILTER_OVER = 10;
+/** Channels before the list gets letter dividers (in the name orders). */
+export const RAIL_LETTERS_FROM = 100;
+
+/** The tick that lights for the channel at `index` of `total`. */
+export function railTick(index, total, max = RAIL_MAX_TICKS) {
+  if (total <= max) return index;
+  return Math.round((index / (total - 1)) * (max - 1));
+}
+
+/** The letter a channel is listed under: accents folded (É → E), '#' for numbers and symbols. */
+export function channelInitial(key) {
+  const first = String(key).normalize('NFD')[0] || '';
+  return /\p{L}/u.test(first) ? first.toUpperCase() : '#';
 }
