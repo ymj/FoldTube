@@ -25,10 +25,18 @@ const groupElements = () => document.querySelectorAll('#video-grid > .video-grou
 
 /** Redraw the rail for these groups (none when not grouped). */
 export function renderRail(next) {
-  groups = state.library.groupBy === 'none' ? [] : next;
   const ticks = $('rail-ticks');
   const list = $('rail-list');
   const filter = $('rail-filter');
+  // The library can redraw while the list is open (a video saved in another
+  // tab): keep what's typed in the filter, and the channel that had focus.
+  const open = isOpen();
+  const query = open ? filter.value : '';
+  const focused = document.activeElement;
+  const focusedKey = open && focused?.classList.contains('rail-item') ? groups[Number(focused.dataset.index)]?.key : undefined;
+  const filterFocused = open && focused === filter;
+
+  groups = state.library.groupBy === 'none' ? [] : next;
   activeIndex = -1;
   typing = false;
   if (groups.length < 2) {
@@ -87,6 +95,15 @@ export function renderRail(next) {
   }));
   updateRailVisibility();
   followScroll(true);
+
+  if (open && isOpen()) {
+    filter.value = filter.hidden ? '' : query;
+    applyFilter();
+    typing = filter.value !== '';
+    const again = focusedKey === undefined ? -1 : groups.findIndex(g => g.key === focusedKey);
+    if (again >= 0 && !items[again].hidden) items[again].focus();
+    else if (filterFocused && !filter.hidden) filter.focus();
+  }
 }
 
 // Hidden when there's nothing to jump between: one channel, a library that
@@ -119,9 +136,11 @@ function openRail({ focus = false } = {}) {
     if (item) list.scrollTop = item.offsetTop - list.clientHeight / 2 + item.offsetHeight / 2;
   }
   if (!focus) return;
-  // After the list shows: a hidden element can't take focus.
+  // A hidden element can't take focus: apply the open styles first (the
+  // popover turns visible at once, only its fade is animated).
   const filter = $('rail-filter');
-  requestAnimationFrame(() => (filter.hidden ? items[activeIndex] : filter)?.focus());
+  void $('rail-popover').offsetHeight;
+  (filter.hidden ? items[activeIndex] : filter)?.focus();
 }
 
 function closeRail({ refocus = false } = {}) {
@@ -173,12 +192,17 @@ const HEADER_OVERHANG = 8;
 
 let followPausedUntil = 0;
 
-function jumpTo(index) {
+function jumpTo(index, { byKeyboard = false } = {}) {
   const group = groupElements()[index];
   if (!group) return;
   // Opens it, and remembers that, as clicking its header would.
   if (group.classList.contains('collapsed')) group.querySelector('.group-toggle').click();
-  closeRail({ refocus: $('channel-rail').contains(document.activeElement) });
+  const rail = $('channel-rail');
+  const focusInside = rail.contains(document.activeElement);
+  // From the keyboard, focus goes back to the rail. From a click, it leaves
+  // the rail, or hovering would no longer close the list on the way out.
+  closeRail({ refocus: byKeyboard && focusInside });
+  if (!byKeyboard && focusInside) document.activeElement.blur();
   setActive(index);
   // Don't let the smooth scroll light up every channel it passes.
   followPausedUntil = performance.now() + 1000;
@@ -247,7 +271,11 @@ export function bindRail() {
   });
   rail.addEventListener('mouseleave', () => {
     clearTimeout(timer);
-    if (!rail.contains(document.activeElement)) timer = setTimeout(closeRail, CLOSE_DELAY);
+    // Stays open while the keyboard is in it (the filter, or a channel
+    // reached with the arrows), not for focus a click left behind.
+    const active = document.activeElement;
+    if (rail.contains(active) && active.matches(':focus-visible')) return;
+    timer = setTimeout(closeRail, CLOSE_DELAY);
   });
   ticks.addEventListener('click', () => openRail({ focus: true }));
   ticks.addEventListener('focus', () => { if (!refocusing) openRail(); });
@@ -265,19 +293,28 @@ export function bindRail() {
   // Before the page's own keys: Esc closes the list first, G opens it.
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && isOpen()) {
-      e.stopPropagation();
-      closeRail({ refocus: rail.contains(document.activeElement) });
+      const inside = rail.contains(document.activeElement);
+      // Esc meant for the rail stops here; from elsewhere (the search box),
+      // it closes the list and still does what it does there.
+      if (inside || document.activeElement === document.body) e.stopPropagation();
+      closeRail({ refocus: inside });
       return;
     }
     if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || document.querySelector('dialog[open]')) return;
-    if (e.key === 'g' || e.key === 'G') {
+    // A Sort or Group menu is open: its keys are its own.
+    if (document.querySelector('.picker-menu:not(.hidden)')) return;
+    if ((e.key === 'g' || e.key === 'G') && !isOpen()) {
       if (rail.classList.contains('hidden')) return;
       e.preventDefault();
       openRail({ focus: true });
-    } else if (isOpen() && !filter.hidden && e.key.length === 1) {
+    } else if (isOpen() && !filter.hidden && e.key.length === 1 && e.key !== ' ') {
       // Opened by hovering: the first letter typed goes to the filter, which
       // doesn't take focus on hover (it would steal typing from the search).
+      // Moving focus mid-keypress doesn't carry the letter over, so add it.
+      e.preventDefault();
       filter.focus();
+      filter.value += e.key;
+      filter.dispatchEvent(new Event('input'));
     }
   }, true);
 
@@ -290,7 +327,7 @@ export function bindRail() {
     if (e.key === 'Enter') {
       e.preventDefault();
       const first = shownItems()[0];
-      if (first) jumpTo(Number(first.dataset.index));
+      if (first) jumpTo(Number(first.dataset.index), { byKeyboard: true });
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       shownItems()[0]?.focus();
@@ -299,7 +336,8 @@ export function bindRail() {
 
   list.addEventListener('click', (e) => {
     const item = e.target.closest('.rail-item');
-    if (item) jumpTo(Number(item.dataset.index));
+    // detail 0: Enter or Space, not a click.
+    if (item) jumpTo(Number(item.dataset.index), { byKeyboard: e.detail === 0 });
   });
   list.addEventListener('keydown', (e) => {
     const shown = shownItems();

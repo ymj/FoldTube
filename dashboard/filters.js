@@ -104,6 +104,31 @@ export function groupByChannel(videos, order = 'channel-az') {
     .map(({ key, videos: list }) => ({ key, videos: list }));
 }
 
+/** A channel group's id, as kept in the collapsed set: Videos and Shorts collapse together. */
+export function groupId(key) {
+  return `channel:${key}`;
+}
+
+/** The videos of one group, in the order given. */
+export function videosInGroup(videos, id) {
+  return videos.filter(v => groupId(channelKey(v)) === id);
+}
+
+/** What Select all picks: everything, or when grouped, what isn't in a collapsed group. */
+export function selectableIn(videos, groupBy, collapsed) {
+  if (groupBy === 'none') return videos;
+  return videos.filter(v => !collapsed.has(groupId(channelKey(v))));
+}
+
+/**
+ * The collapsed groups worth keeping: current-format ids of channels still in
+ * the library. Older ids and channels since emptied are dropped.
+ */
+export function liveCollapsed(collapsed, library) {
+  const channels = new Set(library.map(v => groupId(channelKey(v))));
+  return [...collapsed].filter(id => channels.has(id));
+}
+
 /** Shorts apart from everything else: their own section, or row in a channel group. */
 export function splitByType(videos) {
   const standard = [];
