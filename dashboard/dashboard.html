@@ -174,7 +174,10 @@
     </div>
 
     <div id="videos-section" class="section hidden">
-      <h2 class="section-title">Videos</h2>
+      <div class="section-header">
+        <h2 class="section-title">Videos</h2>
+        <button id="btn-collapse-all" class="btn-collapse-all hidden">Collapse all</button>
+      </div>
       <div id="video-grid" class="video-grid"></div>
     </div>
 
@@ -183,6 +186,18 @@
       <div id="shorts-grid" class="video-grid shorts-grid"></div>
     </div>
   </main>
+
+  <!-- Grouped by channel: where you are, and a list to jump to a channel. -->
+  <nav id="channel-rail" class="channel-rail hidden" aria-label="Channels">
+    <button id="rail-ticks" class="rail-ticks" aria-haspopup="true" aria-expanded="false"
+      aria-controls="rail-popover" title="Jump to channel (G)"></button>
+    <div id="rail-popover" class="rail-popover">
+      <div id="rail-heading" class="rail-heading"></div>
+      <input id="rail-filter" class="rail-filter" type="search" placeholder="Filter channels…"
+        aria-label="Filter channels" autocomplete="off" hidden>
+      <div id="rail-list" class="rail-list" role="menu" aria-labelledby="rail-heading"></div>
+    </div>
+  </nav>
 
   <main id="history-view" class="main-content history-view hidden" aria-labelledby="history-title">
     <div class="history-top">

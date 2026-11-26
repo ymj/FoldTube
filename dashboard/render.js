@@ -8,6 +8,7 @@ import { thumbnailUrlFor, isYouTubeUrl, resumeSeconds, formatDuration, YOUTUBE_T
 import { isBackInLibrary, daysLeft } from '../lib/archive.js';
 import { matchesSearch, historyItems, groupByDay, expiryLabel, HISTORY_FILTERS } from '../lib/history.js';
 import { libraryView, splitByType, groupByChannel, channelKey } from './filters.js';
+import { renderRail } from './rail.js';
 import { state } from './state.js';
 
 /** The library as the grid shows it right now. */
@@ -15,25 +16,21 @@ export function visibleVideos() {
   return libraryView(state.videos, state.library);
 }
 
-/** A group's id: Videos and Shorts collapse separately. */
-export function groupId(section, key) {
-  return `${section}:${key}`;
+/** A channel group's id, as kept in the collapsed set. */
+export function groupId(key) {
+  return `channel:${key}`;
 }
 
-function sectionOf(video) {
-  return video.videoType === 'short' ? 'shorts' : 'videos';
-}
-
-/** A group's videos as the grid shows them (searched and filtered), collapsed or not. */
+/** A group's videos and Shorts as the grid shows them (searched and filtered), collapsed or not. */
 export function groupVideos(id) {
-  return visibleVideos().filter(v => groupId(sectionOf(v), channelKey(v)) === id);
+  return visibleVideos().filter(v => groupId(channelKey(v)) === id);
 }
 
 /** The videos Select all picks: what's on screen, not in collapsed groups. */
 export function selectableVideos() {
   const videos = visibleVideos();
   if (state.library.groupBy === 'none') return videos;
-  return videos.filter(v => !state.library.collapsed.has(groupId(sectionOf(v), channelKey(v))));
+  return videos.filter(v => !state.library.collapsed.has(groupId(channelKey(v))));
 }
 
 // ---- Skeleton loader ----
@@ -84,6 +81,7 @@ export function renderLibrary() {
       shortsGrid.replaceChildren();
       videosSection.classList.add('hidden');
       shortsSection.classList.add('hidden');
+      renderRail([]);
 
       // An empty library gets the welcome; a search or filter with no hits
       // gets a plain "No matches".
@@ -109,15 +107,27 @@ export function renderLibrary() {
       ? `Showing ${videos.length} of ${total} items`
       : `${videos.length} item${videos.length === 1 ? '' : 's'}`;
 
+    // Grouped: one group per channel, its Shorts with it. Otherwise videos
+    // and Shorts each get a section.
+    const byChannel = state.library.groupBy !== 'none';
+    videoGrid.classList.toggle('by-channel', byChannel);
+    if (byChannel) {
+      const groups = groupByChannel(videos, state.library.groupBy);
+      videosSection.classList.remove('hidden');
+      shortsSection.classList.add('hidden');
+      videoGrid.replaceChildren(...channelGroups(groups));
+      shortsGrid.replaceChildren();
+      updateCollapseAll();
+      renderRail(groups);
+      return;
+    }
     const { standard, shorts } = splitByType(videos);
     videosSection.classList.toggle('hidden', standard.length === 0);
     shortsSection.classList.toggle('hidden', shorts.length === 0);
-    // Under a channel header, each card repeating the channel adds nothing.
-    const byChannel = state.library.groupBy !== 'none';
-    videoGrid.classList.toggle('by-channel', byChannel);
-    shortsGrid.classList.toggle('by-channel', byChannel);
-    videoGrid.replaceChildren(...sectionContent('videos', standard));
-    shortsGrid.replaceChildren(...sectionContent('shorts', shorts));
+    videoGrid.replaceChildren(...standard.map((video, i) => createCard(video, i)));
+    shortsGrid.replaceChildren(...shorts.map((video, i) => createCard(video, i)));
+    updateCollapseAll();
+    renderRail([]);
   } catch (err) {
     console.error('Render error:', err);
     // Still on the loading placeholders: say so rather than load forever.
@@ -125,13 +135,12 @@ export function renderLibrary() {
   }
 }
 
-// The cards of one section, or with Group by channel, a group per channel:
-// a header, then its cards.
-function sectionContent(section, videos) {
-  if (state.library.groupBy === 'none') return videos.map(createCard);
+// Group by channel: a group per channel, each a header, its videos, then a
+// row of its Shorts.
+function channelGroups(groups) {
   let index = 0;
-  return groupByChannel(videos, state.library.groupBy).map(({ key, videos: list }) => {
-    const id = groupId(section, key);
+  return groups.map(({ key, videos: list }) => {
+    const id = groupId(key);
     const collapsed = state.library.collapsed.has(id);
     const group = document.createElement('div');
     group.className = collapsed ? 'video-group collapsed' : 'video-group';
@@ -165,7 +174,17 @@ function sectionContent(section, videos) {
 
     header.append(toggle, actions);
 
-    group.append(header, ...list.map(video => createCard(video, index++)));
+    const { standard, shorts } = splitByType(list);
+    group.append(header, ...standard.map(video => createCard(video, index++)));
+    if (shorts.length) {
+      const row = document.createElement('div');
+      row.className = 'group-shorts shorts-grid';
+      const label = document.createElement('div');
+      label.className = 'group-shorts-label';
+      label.textContent = `Shorts · ${shorts.length}`;
+      row.append(label, ...shorts.map(video => createCard(video, index++)));
+      group.appendChild(row);
+    }
     return group;
   });
 }
@@ -197,6 +216,16 @@ export function setGroupCollapsed(group, collapsed) {
   group.querySelector('.group-toggle').setAttribute('aria-expanded', String(!collapsed));
   if (collapsed) state.library.collapsed.add(group.dataset.group);
   else state.library.collapsed.delete(group.dataset.group);
+  updateCollapseAll();
+}
+
+/** Collapse all, or Expand all once every group is collapsed; only with 2+ groups. */
+export function updateCollapseAll() {
+  const button = document.getElementById('btn-collapse-all');
+  const groups = document.querySelectorAll('#video-grid > .video-group');
+  button.classList.toggle('hidden', groups.length < 2);
+  const allCollapsed = [...groups].every(g => g.classList.contains('collapsed'));
+  button.textContent = allCollapsed ? 'Expand all' : 'Collapse all';
 }
 
 /** Tick or untick a card, keeping the selection and the bar in step. */

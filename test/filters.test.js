@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, GROUP_BY, SORT_FIELDS, SORTS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, channelInitial, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS } from '../dashboard/filters.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -152,6 +152,18 @@ describe('group by channel', () => {
     assert.deepEqual(parseSort(undefined), { field: 'date', direction: 'desc' });
   });
 
+  test("a channel's Shorts are in its group, after its videos once split", () => {
+    const mixed = [
+      v('a1', { channelName: 'Amy', dateSaved: at(3) }),
+      v('as', { channelName: 'Amy', videoType: 'short', dateSaved: at(5) }),
+      v('bs', { channelName: 'Bob', videoType: 'short', dateSaved: at(4) }),
+    ];
+    const groups = groupByChannel(libraryView(mixed));
+    assert.deepEqual(shape(groups), [['Amy', ['as', 'a1']], ['Bob', ['bs']]]);
+    const { standard, shorts } = splitByType(groups[0].videos);
+    assert.deepEqual([ids(standard), ids(shorts)], [['a1'], ['as']]);
+  });
+
   test('500 videos from 150 channels group quickly', () => {
     const many = Array.from({ length: 500 }, (_, i) => v(`v${i}`, { channelName: `Channel ${i % 150}`, dateSaved: new Date(Date.UTC(2026, 0, 1) + i * 3600000).toISOString() }));
     const start = performance.now();
@@ -159,6 +171,36 @@ describe('group by channel', () => {
     assert.equal(groups.length, 150);
     assert.equal(groups.reduce((n, g) => n + g.videos.length, 0), 500);
     assert.ok(performance.now() - start < 50, 'under 50 ms');
+  });
+});
+
+describe('channel rail', () => {
+  test('one tick per channel up to 18', () => {
+    assert.equal(RAIL_MAX_TICKS, 18);
+    for (let i = 0; i < 18; i++) assert.equal(railTick(i, 18), i);
+    assert.equal(railTick(3, 5), 3);
+  });
+
+  test('more channels: ticks stand for several, first and last at the ends, in order', () => {
+    for (const total of [19, 40, 150]) {
+      const ticks = Array.from({ length: total }, (_, i) => railTick(i, total));
+      assert.equal(ticks[0], 0);
+      assert.equal(ticks.at(-1), 17);
+      assert.ok(ticks.every((t, i) => i === 0 || t >= ticks[i - 1]), `in order for ${total}`);
+      assert.equal(new Set(ticks).size, 18, `every tick used for ${total}`);
+    }
+  });
+
+  test('letters: accents folded, numbers and symbols under #', () => {
+    assert.deepEqual(['amy', 'Émile', 'Øyvind', '3Blue1Brown', '@home', '_x', '日本', ''].map(channelInitial),
+      ['A', 'E', 'Ø', '#', '#', '#', '日', '#']);
+  });
+
+  test('the page has the rail and Collapse all', async () => {
+    const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
+    for (const id of ['channel-rail', 'rail-ticks', 'rail-popover', 'rail-heading', 'rail-filter', 'rail-list', 'btn-collapse-all']) {
+      assert.match(html, new RegExp(`id="${id}"`), id);
+    }
   });
 });
 
