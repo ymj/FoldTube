@@ -147,7 +147,7 @@ If a future update ever changes how FoldTube handles data, for example if option
 
 ### Contact
 
-Questions about privacy: [hello+foldtube@osumapps.com](mailto:hello+foldtube@osumapps.com)
+Questions about privacy: [foldtube@osumapps.com](mailto:foldtube@osumapps.com)
 
 ---
 
