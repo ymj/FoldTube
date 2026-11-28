@@ -1,7 +1,8 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, railChannelAt, railWaveWeights, railPeekRange, isAimingAtPopover, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS, RAIL_PEEK_OVER, LAYOUTS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, matchesMedia, splitByType, groupByChannel, parseSort, railTick, railChannelAt, railWaveWeights, railPeekRange, isAimingAtPopover, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, MEDIA_FILTERS, SORT_FIELDS, SORTS, RAIL_MAX_TICKS, RAIL_PEEK_OVER, LAYOUTS } from '../dashboard/filters.js';
+import { state } from '../dashboard/state.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -58,6 +59,89 @@ describe('library view', () => {
     const { standard, shorts } = splitByType([v('a'), v('s1', { videoType: 'short' }), v('b', { videoType: 'video' }), v('s2', { videoType: 'short' })]);
     assert.deepEqual(ids(standard), ['a', 'b']);
     assert.deepEqual(ids(shorts), ['s1', 's2']);
+  });
+
+  test('media filter: All, Videos only, or Shorts only; unknown matches all', () => {
+    const vid = v('v1', { videoType: 'video' });
+    const legacy = v('v2');
+    const short = v('s1', { videoType: 'short' });
+    assert.deepEqual(MEDIA_FILTERS, ['all', 'video', 'short']);
+    for (const item of [vid, legacy, short]) {
+      assert.equal(matchesMedia(item, 'all'), true);
+      assert.equal(matchesMedia(item), true);
+      assert.equal(matchesMedia(item, 'unknown'), true);
+    }
+    assert.equal(matchesMedia(vid, 'video'), true);
+    assert.equal(matchesMedia(legacy, 'video'), true);
+    assert.equal(matchesMedia(short, 'video'), false);
+    assert.equal(matchesMedia(vid, 'short'), false);
+    assert.equal(matchesMedia(legacy, 'short'), false);
+    assert.equal(matchesMedia(short, 'short'), true);
+  });
+
+  test('media filter combines with search, length, Sort and Group by media type', () => {
+    const mixed = [
+      v('v1', { title: 'Rust long', videoType: 'video', durationSeconds: 4000, dateSaved: '2026-11-01T00:00:00.000Z' }),
+      v('v2', { title: 'Rust quick', videoType: 'video', durationSeconds: 120, dateSaved: '2026-11-03T00:00:00.000Z' }),
+      v('s1', { title: 'Rust tip', videoType: 'short', durationSeconds: 45, dateSaved: '2026-11-02T00:00:00.000Z' }),
+      v('s2', { title: 'Cooking tip', videoType: 'short', durationSeconds: 30, dateSaved: '2026-11-04T00:00:00.000Z' }),
+    ];
+    assert.deepEqual(ids(libraryView(mixed, { media: 'video' })), ['v2', 'v1']);
+    assert.deepEqual(ids(libraryView(mixed, { media: 'short' })), ['s2', 's1']);
+    assert.deepEqual(ids(libraryView(mixed, { media: 'short', query: 'rust' })), ['s1']);
+    assert.deepEqual(ids(libraryView(mixed, { media: 'video', query: 'rust', duration: { min: 0, max: 300 }, sort: 'title-asc' })), ['v2']);
+    assert.deepEqual(libraryView(mixed, { media: 'short', duration: { min: 3600, max: 999999 } }), []);
+
+    // Group by media type: only one section has items when filtered.
+    const onlyVideos = splitByType(libraryView(mixed, { media: 'video' }));
+    assert.deepEqual([ids(onlyVideos.standard), ids(onlyVideos.shorts)], [['v2', 'v1'], []]);
+    const onlyShorts = splitByType(libraryView(mixed, { media: 'short' }));
+    assert.deepEqual([ids(onlyShorts.standard), ids(onlyShorts.shorts)], [[], ['s2', 's1']]);
+  });
+
+  test('media filter with Group by channel: channels, counts, group actions and Select all follow', () => {
+    const mixed = [
+      v('a1', { channelName: 'Amy', videoType: 'video', dateSaved: '2026-11-01T00:00:00.000Z' }),
+      v('as1', { channelName: 'Amy', videoType: 'short', dateSaved: '2026-11-05T00:00:00.000Z' }),
+      v('as2', { channelName: 'Amy', videoType: 'short', dateSaved: '2026-11-04T00:00:00.000Z' }),
+      v('bs1', { channelName: 'Bob', videoType: 'short', dateSaved: '2026-11-03T00:00:00.000Z' }),
+      v('c1', { channelName: 'Cat', videoType: 'video', dateSaved: '2026-11-02T00:00:00.000Z' }),
+      v('c2', { channelName: 'Cat', videoType: 'video', dateSaved: '2026-11-06T00:00:00.000Z' }),
+    ];
+    const shape = (groups) => groups.map(g => [g.key, ids(g.videos)]);
+
+    // Videos only: Bob (Shorts-only) disappears; Cat leads by count (2 vs 1).
+    const shownVideos = libraryView(mixed, { media: 'video' });
+    assert.deepEqual(shape(groupByChannel(shownVideos, 'channel-count')), [['Cat', ['c2', 'c1']], ['Amy', ['a1']]]);
+    assert.deepEqual(ids(videosInGroup(shownVideos, groupId('Amy'))), ['a1']);
+    assert.deepEqual(ids(selectableIn(shownVideos, 'channel-az', new Set([groupId('Cat')]))), ['a1']);
+    assert.deepEqual(ids(selectableIn(shownVideos, 'none', new Set())), ['c2', 'c1', 'a1']);
+
+    // Shorts only: Cat (Videos-only) disappears; Amy leads by count (2 vs 1).
+    const shownShorts = libraryView(mixed, { media: 'short' });
+    assert.deepEqual(shape(groupByChannel(shownShorts, 'channel-count')), [['Amy', ['as1', 'as2']], ['Bob', ['bs1']]]);
+    assert.deepEqual(ids(videosInGroup(shownShorts, groupId('Amy'))), ['as1', 'as2']);
+    assert.deepEqual(ids(selectableIn(shownShorts, 'channel-az', new Set([groupId('Amy')]))), ['bs1']);
+  });
+
+  test('media filter starts at All and is not remembered between visits', async () => {
+    assert.equal(state.library.media, 'all');
+    const storeSrc = await readFile(new URL('../dashboard/store.js', import.meta.url), 'utf8');
+    assert.doesNotMatch(storeSrc, /\bmedia\b/);
+  });
+
+  test('the filter menu offers media type and length choices, both at All by default', async () => {
+    const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
+    for (const id of ['filter-picker', 'filter-button', 'filter-menu', 'filter-count', 'btn-clear-filters', 'active-filters']) {
+      assert.match(html, new RegExp(`id="${id}"`), id);
+    }
+    const mediaGroup = html.match(/<div role="group" id="media-filters"[\s\S]*?\n {8}<\/div>/)?.[0] ?? '';
+    assert.match(mediaGroup, /aria-label="Media type"/);
+    const mediaRadios = [...mediaGroup.matchAll(/<button\b([^>]*)>/g)].map(m => m[1]);
+    assert.deepEqual(mediaRadios.map(a => a.match(/data-media="(\w+)"/)?.[1]), MEDIA_FILTERS);
+    assert.ok(mediaRadios.every(a => /role="menuitemradio"/.test(a)));
+    assert.deepEqual(mediaRadios.map(a => a.match(/aria-checked="(true|false)"/)?.[1]), ['true', 'false', 'false']);
+    assert.match(html, /<div role="group" id="duration-filters" aria-label="Length">/);
   });
 });
 

@@ -8,7 +8,7 @@ import { bindRail } from './rail.js';
 import { historyItems } from '../lib/history.js';
 import { describeShortcuts } from '../lib/shortcuts.js';
 import { state } from './state.js';
-import { SORT_FIELDS, parseSort } from './filters.js';
+import { SORT_FIELDS, MEDIA_FILTERS, parseSort } from './filters.js';
 import { changeVideos, archiveVideos, unarchiveVideos, saveSettings, clearApiError, saveLibraryView } from './store.js';
 import {
   selectableVideos, groupVideos, setGroupCollapsed, updateCollapseAll, renderLibrary, renderHistory, renderSettingsHistory, renderBackupButtons,
@@ -584,7 +584,208 @@ function showMessageToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove('visible'), 4000);
 }
 
-// ---- Search, sort and length filter ----
+// ---- Search, sort and filters ----
+const MEDIA_LABELS = { video: 'Videos', short: 'Shorts' };
+
+function bindFilterMenu() {
+  const view = state.library;
+  const picker = document.getElementById('filter-picker');
+  const button = document.getElementById('filter-button');
+  const countBadge = document.getElementById('filter-count');
+  const menu = document.getElementById('filter-menu');
+  const footer = document.getElementById('filter-menu-footer');
+  const activeBar = document.getElementById('active-filters');
+  const durationGroup = document.getElementById('duration-filters');
+  const mediaItems = [...document.querySelectorAll('#media-filters [role="menuitemradio"]')];
+  const durationItems = [...durationGroup.querySelectorAll('[role="menuitemradio"]')];
+  const allDurationItem = durationItems.find(i => i.dataset.all === 'true');
+  let activeDurationLabel = '';
+
+  const visibleItems = () => [...menu.querySelectorAll('[role="menuitemradio"]:not(:disabled), [role="menuitem"]:not(:disabled)')]
+    .filter(el => !el.closest('.hidden'));
+
+  const open = () => {
+    menu.classList.remove('hidden');
+    button.setAttribute('aria-expanded', 'true');
+    (mediaItems.find(i => i.getAttribute('aria-checked') === 'true') || mediaItems[0]).focus();
+  };
+  const close = ({ focusButton = true } = {}) => {
+    if (menu.classList.contains('hidden')) return;
+    menu.classList.add('hidden');
+    button.setAttribute('aria-expanded', 'false');
+    if (focusButton) button.focus();
+  };
+
+  button.addEventListener('click', () => (menu.classList.contains('hidden') ? open() : close()));
+  button.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
+  });
+
+  menu.addEventListener('keydown', (e) => {
+    const items = visibleItems();
+    const index = items.indexOf(document.activeElement);
+    const move = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+    if (move) {
+      e.preventDefault();
+      items[(index + move + items.length) % items.length].focus();
+    } else if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      items[e.key === 'Home' ? 0 : items.length - 1].focus();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      close();
+    } else if (e.key === 'Tab') {
+      close({ focusButton: false });
+    }
+  });
+
+  // Same outside-click handling as Sort and Group menus: closes without
+  // clicking a card underneath.
+  let swallowClick = false;
+  document.addEventListener('pointerdown', (e) => {
+    swallowClick = false;
+    if (menu.classList.contains('hidden') || picker.contains(e.target)) return;
+    close({ focusButton: false });
+    swallowClick = !e.target.closest('.menu-picker');
+  });
+  document.addEventListener('click', (e) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+  document.addEventListener('keydown', () => { swallowClick = false; }, true);
+
+  const renderActiveChips = () => {
+    const chips = [];
+    if (view.media !== 'all') chips.push({ kind: 'media', label: MEDIA_LABELS[view.media] });
+    if (view.duration && activeDurationLabel) chips.push({ kind: 'duration', label: activeDurationLabel });
+
+    const count = chips.length;
+    button.classList.toggle('active', count > 0);
+    button.setAttribute('aria-label', count ? `Filters (${count} active)` : 'Filters');
+    countBadge.textContent = count ? String(count) : '';
+    countBadge.classList.toggle('hidden', count === 0);
+    footer.classList.toggle('hidden', count === 0);
+    activeBar.classList.toggle('hidden', count === 0);
+
+    if (count === 0) {
+      activeBar.replaceChildren();
+      return;
+    }
+
+    const prefix = document.createElement('span');
+    prefix.className = 'active-filters-label';
+    prefix.textContent = 'Filtered by';
+
+    const nodes = [prefix];
+    for (const { kind, label } of chips) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'active-filter-chip';
+      chip.dataset.clear = kind;
+      chip.setAttribute('aria-label', `Remove ${label} filter`);
+      const text = document.createElement('span');
+      text.textContent = label;
+      const x = document.createElement('span');
+      x.className = 'chip-remove';
+      x.setAttribute('aria-hidden', 'true');
+      x.textContent = '×';
+      chip.append(text, x);
+      nodes.push(chip);
+    }
+
+    if (count > 1) {
+      const clearAll = document.createElement('button');
+      clearAll.type = 'button';
+      clearAll.className = 'active-filters-clear';
+      clearAll.dataset.clear = 'all';
+      clearAll.textContent = 'Clear all';
+      nodes.push(clearAll);
+    }
+    activeBar.replaceChildren(...nodes);
+  };
+
+  const syncDurationState = () => {
+    const disabled = view.media === 'short';
+    durationGroup.classList.toggle('disabled', disabled);
+    durationGroup.setAttribute('aria-disabled', String(disabled));
+    for (const item of durationItems) {
+      item.disabled = disabled;
+      if (disabled) item.setAttribute('aria-checked', String(item === allDurationItem));
+    }
+  };
+
+  const setMedia = (media) => {
+    if (!MEDIA_FILTERS.includes(media) || view.media === media) return;
+    view.media = media;
+    for (const item of mediaItems) {
+      item.setAttribute('aria-checked', String(item.dataset.media === media));
+    }
+    if (media === 'short') {
+      view.duration = null;
+      activeDurationLabel = '';
+    }
+    syncDurationState();
+    renderActiveChips();
+    renderLibrary();
+  };
+
+  const setDuration = (target) => {
+    if (view.media === 'short') return;
+    const isAll = target === allDurationItem || target.dataset.all === 'true';
+    const next = isAll ? null : { min: parseInt(target.dataset.min, 10), max: parseInt(target.dataset.max, 10) };
+    const changed = Boolean(view.duration) !== Boolean(next)
+      || (view.duration && next && (view.duration.min !== next.min || view.duration.max !== next.max));
+    if (!changed) return;
+    view.duration = next;
+    activeDurationLabel = isAll ? '' : target.textContent.trim();
+    const chosen = isAll ? allDurationItem : target;
+    for (const item of durationItems) {
+      item.setAttribute('aria-checked', String(item === chosen));
+    }
+    renderActiveChips();
+    renderLibrary();
+  };
+
+  const clearAllFilters = () => {
+    if (view.media === 'all' && !view.duration) return;
+    view.media = 'all';
+    view.duration = null;
+    activeDurationLabel = '';
+    for (const item of mediaItems) item.setAttribute('aria-checked', String(item.dataset.media === 'all'));
+    for (const item of durationItems) item.setAttribute('aria-checked', String(item === allDurationItem));
+    syncDurationState();
+    renderActiveChips();
+    renderLibrary();
+  };
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('[role="menuitemradio"], [role="menuitem"]');
+    if (!item) return;
+    if (item.id === 'btn-clear-filters') {
+      clearAllFilters();
+      close();
+    } else if (item.dataset.media) {
+      setMedia(item.dataset.media);
+    } else {
+      setDuration(item);
+    }
+  });
+
+  activeBar.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-clear]');
+    if (!trigger) return;
+    const kind = trigger.dataset.clear;
+    if (kind === 'media') setMedia('all');
+    else if (kind === 'duration') setDuration(allDurationItem);
+    else clearAllFilters();
+    // Keep keyboard focus somewhere sensible after removing a chip.
+    const nextChip = activeBar.querySelector('.active-filter-chip');
+    (nextChip || button).focus();
+  });
+}
+
 function bindLibraryControls() {
   const view = state.library;
   document.getElementById('search-input').addEventListener('input', debounce((e) => {
@@ -592,22 +793,8 @@ function bindLibraryControls() {
     renderLibrary();
   }, 150));
 
+  bindFilterMenu();
   bindViewMenus();
-
-  document.getElementById('duration-filters').addEventListener('click', (e) => {
-    if (!e.target.classList.contains('filter-pill')) return;
-    const isAllPill = e.target.dataset.all === 'true';
-    const isOn = e.target.classList.contains('active');
-    document.querySelectorAll('.filter-pill').forEach(btn => btn.classList.remove('active'));
-    if (isAllPill || isOn) {
-      document.querySelector('.filter-pill[data-all="true"]').classList.add('active');
-      view.duration = null;
-    } else {
-      e.target.classList.add('active');
-      view.duration = { min: parseInt(e.target.dataset.min, 10), max: parseInt(e.target.dataset.max, 10) };
-    }
-    renderLibrary();
-  });
 }
 
 // ---- Cards ----

@@ -119,7 +119,7 @@ export function renderLibrary() {
         videoCount.textContent = '0 items';
         refreshEmptyState();
       } else {
-        videoCount.textContent = `Showing 0 of ${total} items`;
+        videoCount.textContent = `0 of ${total} items`;
       }
       return;
     }
@@ -128,7 +128,7 @@ export function renderLibrary() {
     document.getElementById('controls-bar').classList.remove('hidden');
     videoCount.classList.remove('hidden');
     videoCount.textContent = total !== videos.length
-      ? `Showing ${videos.length} of ${total} items`
+      ? `${videos.length} of ${total} items`
       : `${videos.length} item${videos.length === 1 ? '' : 's'}`;
 
     // Grouped: one group per channel, its Shorts with it. Otherwise videos
