@@ -1,21 +1,20 @@
+/* global ytInitialPlayerResponse -- YouTube page global, read by readYouTubePlayer in the page's world */
 // scrapeYouTubeTab is passed to chrome.scripting.executeScript, which
 // serialises the function body and runs it inside the YouTube page. It must
 // stay self-contained: no imports, no references to outer variables. Its video
 // ID and ISO 8601 duration logic therefore duplicates lib/youtube.js; keep the
 // two in step when changing either.
 export function scrapeYouTubeTab() {
-  const isShort = window.location.pathname.startsWith('/shorts/');
-  const isLive = window.location.pathname.startsWith('/live/');
+  // Empty segments dropped, so /shorts/<id>/ works like /shorts/<id>.
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const isShort = segments[0] === 'shorts';
+  const isLive = segments[0] === 'live';
   let videoId;
   let videoType = 'video';
 
-  if (isShort) {
-    const parts = window.location.pathname.split('/');
-    videoId = parts[parts.length - 1];
-    videoType = 'short';
-  } else if (isLive) {
-    const parts = window.location.pathname.split('/');
-    videoId = parts[parts.length - 1];
+  if (isShort || isLive) {
+    videoId = segments[1] || null;
+    if (isShort) videoType = 'short';
   } else {
     const videoIdMatch = window.location.search.match(/[?&]v=([^&]+)/);
     videoId = videoIdMatch ? videoIdMatch[1] : null;
@@ -23,17 +22,23 @@ export function scrapeYouTubeTab() {
 
   if (!videoId) return null;
 
-  // Title extraction with fallbacks
+  // Title: the watch page's heading (current layout, then the older one); on
+  // Shorts, the active Short's, not a neighbour's in the feed.
   let title = '';
-  const titleVideoEl = document.querySelector('h1.ytd-video-primary-info-renderer');
-  const titleShortEl = document.querySelector('h2.title.ytd-reel-player-header-renderer');
-  
-  if (titleVideoEl && titleVideoEl.textContent.trim()) {
-    title = titleVideoEl.textContent.trim();
-  } else if (titleShortEl && titleShortEl.textContent.trim()) {
-    title = titleShortEl.textContent.trim();
+  const titleVideoEl = document.querySelector('ytd-watch-metadata h1')
+    || document.querySelector('h1.ytd-video-primary-info-renderer');
+  const titleShortEl = document.querySelector('ytd-reel-video-renderer[is-active] h2.title')
+    || document.querySelector('ytd-reel-player-header-renderer[is-active] h2.title');
+
+  // YouTube keeps the page you came from in the DOM, hidden: on Shorts, a
+  // watch page heading may still be there with the earlier video's title.
+  // So only this page's kind counts.
+  const headingEl = isShort ? titleShortEl : titleVideoEl;
+  if (headingEl && headingEl.textContent.trim()) {
+    title = headingEl.textContent.trim();
   } else if (document.title) {
-    title = document.title;
+    // The tab title, minus YouTube's unread count: "(3) Title - YouTube".
+    title = document.title.replace(/^\(\d+\+?\)\s+/, '');
   }
 
   if (title.endsWith(' - YouTube')) {
@@ -47,18 +52,23 @@ export function scrapeYouTubeTab() {
 
   // ytd-video-owner-renderer is used on /watch, ytd-reel-player-header-renderer on /shorts
   const channelVideoEl = document.querySelector('ytd-video-owner-renderer ytd-channel-name a') || document.querySelector('#channel-name a');
-  const channelShortEl = document.querySelector('ytd-reel-player-header-renderer[is-active] ytd-channel-name a') || document.querySelector('ytd-reel-player-header-renderer ytd-channel-name a');
+  // Only the active Short's: the feed keeps its neighbours in the page.
+  const channelShortEl = document.querySelector('ytd-reel-player-header-renderer[is-active] ytd-channel-name a');
   
-  const finalChannelEl = isShort ? (channelShortEl || channelVideoEl) : (channelVideoEl || channelShortEl);
+  // As with the title: only this page's kind (a hidden watch page may linger).
+  const finalChannelEl = isShort ? channelShortEl : channelVideoEl;
 
   if (finalChannelEl) {
     channelName = finalChannelEl.textContent.trim();
     channelUrl = finalChannelEl.href;
   } else {
-    const authorLink = document.querySelector('link[itemprop="name"]');
+    // The page's structured data: the channel is the author block. A bare
+    // itemprop="url" is the video's own URL.
+    const author = document.querySelector('[itemprop="author"]');
+    const authorLink = author?.querySelector('link[itemprop="name"]');
     if (authorLink) channelName = authorLink.getAttribute('content');
-    
-    const urlLink = document.querySelector('link[itemprop="url"]');
+
+    const urlLink = author?.querySelector('link[itemprop="url"]');
     if (urlLink) channelUrl = urlLink.getAttribute('href');
   }
 
@@ -66,12 +76,15 @@ export function scrapeYouTubeTab() {
 
   let durationSeconds = 0;
   let durationFormatted = '';
+  let durationSource = null;
 
   if (!isShort) {
-    // Prefer the meta tag — it always reflects the real video duration,
-    // even when an ad is playing (the player UI shows the ad length instead).
+    // The meta tag shows the real duration even during an ad (the player UI
+    // shows the ad's), but YouTube doesn't update it when you move to another
+    // video in the same tab: trust it only when it names this video.
     const metaDuration = document.querySelector('meta[itemprop="duration"]');
-    if (metaDuration) {
+    const metaVideoId = document.querySelector('meta[itemprop="identifier"], meta[itemprop="videoId"]')?.getAttribute('content');
+    if (metaDuration && metaVideoId === videoId) {
       const pt = metaDuration.getAttribute('content') || '';
       const match = pt.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
       if (match) {
@@ -87,8 +100,10 @@ export function scrapeYouTubeTab() {
       }
     }
 
-    // Fallback: read the player UI (may be wrong during ads, but better than nothing)
+    // Fallback: read the player UI. During an ad it shows the ad's length;
+    // the worker drops it then (it knows from the player whether one plays).
     if (!durationSeconds) {
+      durationSource = 'player-ui';
       const durationEl = document.querySelector('span.ytp-time-duration');
       durationFormatted = durationEl ? durationEl.textContent.trim() : '';
 
@@ -118,8 +133,48 @@ export function scrapeYouTubeTab() {
     thumbnailUrl,
     durationSeconds,
     durationFormatted,
+    ...(durationSource && { durationSource }),
     description,
     dateSaved: new Date().toISOString(),
     metadataSource: 'scrape'
   };
+}
+
+// readYouTubePlayer runs in the page's own world (MAIN), where the player
+// object and YouTube's page data are visible. Like scrapeYouTubeTab it must
+// stay self-contained.
+//
+// Duration, best source first:
+//   1. the player's response for the video it has loaded now;
+//   2. ytInitialPlayerResponse, but only if it is this video: YouTube sets it
+//      for the first video a tab loads and leaves it there when you move on;
+//   3. the player's own length, unless an ad is playing (that's the ad's).
+export function readYouTubePlayer() {
+  try {
+    const p = document.querySelector('#movie_player');
+    const data = p && typeof p.getVideoData === 'function' ? p.getVideoData() : null;
+    const adShowing = Boolean(p?.classList?.contains('ad-showing'));
+    const currentId = data?.video_id
+      || new URLSearchParams(window.location.search).get('v')
+      || window.location.pathname.split('/').filter(Boolean)[1]
+      || null;
+    const seconds = (response) => {
+      const details = response?.videoDetails;
+      if (!details || (currentId && details.videoId !== currentId)) return 0;
+      return parseInt(details.lengthSeconds, 10) || 0;
+    };
+
+    let duration = 0;
+    if (p && typeof p.getPlayerResponse === 'function') duration = seconds(p.getPlayerResponse());
+    if (!duration && typeof ytInitialPlayerResponse !== 'undefined') {
+      duration = seconds(ytInitialPlayerResponse);
+    }
+    if (!duration && p && typeof p.getDuration === 'function' && !adShowing) {
+      duration = data?.video_quality_features?.length_seconds || p.getDuration() || 0;
+    }
+    const position = p && typeof p.getCurrentTime === 'function' ? p.getCurrentTime() : null;
+    return { duration, position, isLive: Boolean(data?.isLive), adShowing };
+  } catch (_) {
+    return null;
+  }
 }

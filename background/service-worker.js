@@ -1,8 +1,7 @@
-/* global ytInitialPlayerResponse -- YouTube page global, read by the MAIN-world duration probe */
-import { scrapeYouTubeTab } from '../content/scraper.js';
+import { scrapeYouTubeTab, readYouTubePlayer } from '../content/scraper.js';
 import { showSavedMark } from '../content/saved-mark.js';
 import { parseVideoUrl, parseIsoDuration, formatDuration, positionFromPlayer, YOUTUBE_TAB_PATTERNS } from '../lib/youtube.js';
-import { foldTabs, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
+import { foldTabs, stillShowsVideo, autoCollapseVideo, buildTabSnapshot, updateTabSnapshot, recoverClosedTabs } from '../lib/fold.js';
 import { createSerialQueue, createVideoStore, applyVideoOp, patchVideos, reconcileRestoredTabs } from '../lib/store.js';
 import { videoIdsForLookup, oembedUrl, classifyOembedStatus, applyOembedResults } from '../lib/oembed.js';
 import { linkToVideo, MENU_FOLD_TAB, MENU_SAVE_LINK, createMenuInstaller } from '../lib/contextmenu.js';
@@ -249,33 +248,20 @@ async function scrapeTab(tab) {
     const playerResults = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       world: 'MAIN',
-      func: () => {
-        try {
-          let duration = 0;
-          const p = document.querySelector('#movie_player');
-          const data = p && typeof p.getVideoData === 'function' ? p.getVideoData() : null;
-          if (typeof ytInitialPlayerResponse !== 'undefined') {
-            duration = parseInt(ytInitialPlayerResponse?.videoDetails?.lengthSeconds, 10) || 0;
-          }
-          if (!duration && p && typeof p.getDuration === 'function') {
-            duration = data?.video_quality_features?.length_seconds || p.getDuration() || 0;
-          }
-          const position = p && typeof p.getCurrentTime === 'function' ? p.getCurrentTime() : null;
-          return {
-            duration,
-            position,
-            isLive: Boolean(data?.isLive),
-            adShowing: Boolean(p?.classList?.contains('ad-showing')),
-          };
-        } catch (_) { return null; }
-      },
+      func: readYouTubePlayer,
     });
     player = playerResults[0]?.result || null;
     const realDuration = Math.round(player?.duration || 0);
     if (realDuration > 0) {
       metadata.durationSeconds = realDuration;
       metadata.durationFormatted = formatDuration(realDuration);
+    } else if (player?.adShowing && metadata.durationSource === 'player-ui') {
+      // The page's player shows the ad's length, not the video's: better
+      // unknown (filled in later with an API key) than wrong.
+      metadata.durationSeconds = 0;
+      metadata.durationFormatted = '';
     }
+    delete metadata.durationSource;
   } catch (_) { /* the player read is best-effort */ }
   const { seconds, source } = positionFromPlayer(metadata, player);
   metadata.timestampSeconds = seconds;
@@ -288,22 +274,43 @@ function saveFoldedVideos(videos) {
   return applyOp({ type: 'add', videos });
 }
 
-// Save first, then close only the tabs that were saved (see lib/fold.js).
-async function processAndSaveTabs(tabs) {
-  if (!tabs || tabs.length === 0) return { closed: 0, leftOpen: 0, saved: 0, saveFailed: false };
-
-  const result = await foldTabs(tabs, {
-    readTab: scrapeTab,
-    save: saveFoldedVideos,
-    closeTab: (tabId) => chrome.tabs.remove(tabId),
-  });
-
-  // Fill in channel (and, with an API key, duration) for URL-only entries.
-  if (result.saved > 0) fillInMetadata();
-  return result;
+// Close a folded tab, unless it has since moved to another page or video,
+// or was closed meanwhile (nothing to do).
+async function closeFoldedTab(tabId, videoId) {
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab) return;
+  if (!stillShowsVideo(tab, videoId)) throw new Error('The tab moved on before it could be closed');
+  await chrome.tabs.remove(tabId);
 }
 
-async function handleCollapse() {
+// One fold at a time: a second one waits, so two never read and close the
+// same tabs.
+const enqueueFold = createSerialQueue();
+
+// Save first, then close only the tabs that were saved (see lib/fold.js).
+function processAndSaveTabs(tabs) {
+  if (!tabs || tabs.length === 0) return Promise.resolve({ closed: 0, leftOpen: 0, saved: 0, saveFailed: false });
+  return enqueueFold(async () => {
+    // These tabs were listed before this fold waited its turn: a fold just
+    // before may have closed some. Fold the ones still open, as they are now.
+    const current = (await Promise.all(tabs.map(t => chrome.tabs.get(t.id).catch(() => null)))).filter(Boolean);
+    if (current.length === 0) return { closed: 0, leftOpen: 0, saved: 0, saveFailed: false };
+    const result = await foldTabs(current, { readTab: scrapeTab, save: saveFoldedVideos, closeTab: closeFoldedTab });
+    // Fill in channel (and, with an API key, duration) for URL-only entries.
+    if (result.saved > 0) fillInMetadata();
+    return result;
+  });
+}
+
+// The toolbar icon. A second click while a fold is running (a double-click)
+// doesn't start another.
+let collapsing = null;
+function handleCollapse() {
+  collapsing ??= collapseAndOpenDashboard().finally(() => { collapsing = null; });
+  return collapsing;
+}
+
+async function collapseAndOpenDashboard() {
   const tabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
   
   if (tabs.length > 0) {
@@ -325,7 +332,15 @@ chrome.action.onClicked.addListener(handleCollapse);
 // Without the "tabs" permission the worker can't find the dashboard tab by
 // its URL, so it asks: an open dashboard brings itself to the front and
 // answers. With no answer, a new one is opened.
-async function handleOpenDashboard() {
+// Two calls at once would both find no dashboard and open two: the second
+// waits for the first.
+let openingDashboard = null;
+function handleOpenDashboard() {
+  openingDashboard ??= openOrFocusDashboard().finally(() => { openingDashboard = null; });
+  return openingDashboard;
+}
+
+async function openOrFocusDashboard() {
   try {
     const focused = await chrome.runtime.sendMessage({ action: "focusDashboard" }).catch(() => false);
     if (focused) return;
