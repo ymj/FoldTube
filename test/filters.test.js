@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, railChannelAt, railWaveWeights, railPeekRange, isAimingAtPopover, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS } from '../dashboard/filters.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -217,9 +217,60 @@ describe('channel rail', () => {
       ['A', 'E', 'Ø', '#', '#', '#', '日', '#']);
   });
 
+  test('railChannelAt maps pointer ratio continuously across all channels', () => {
+    assert.equal(railChannelAt(0.5, 0), -1);
+    assert.equal(railChannelAt(0.5, 1), 0);
+    assert.equal(railChannelAt(-0.5, 50), 0);
+    assert.equal(railChannelAt(0, 50), 0);
+    assert.equal(railChannelAt(0.5, 51), 25);
+    assert.equal(railChannelAt(1, 50), 49);
+    assert.equal(railChannelAt(1.5, 50), 49);
+    // Every channel is reachable across a sweep, even with >18 channels.
+    const seen = new Set(Array.from({ length: 201 }, (_, i) => railChannelAt(i / 200, 60)));
+    assert.equal(seen.size, 60);
+  });
+
+  test('railWaveWeights peaks at the pointer and tapers smoothly to zero', () => {
+    assert.deepEqual(railWaveWeights(0, 0.5), []);
+    assert.deepEqual(railWaveWeights(1, 0.5), [1]);
+    const w = railWaveWeights(11, 0.5); // pointer at tick 5
+    assert.equal(w.length, 11);
+    assert.equal(w[5], 1);
+    assert.ok(w[4] > 0.5 && w[4] < 1);
+    assert.equal(w[4], w[6]);
+    assert.ok(w[3] > 0 && w[3] < w[4]);
+    assert.equal(w[2], 0);
+    assert.equal(w[0], 0);
+    assert.equal(w[10], 0);
+  });
+
+  test('isAimingAtPopover detects leftward moves aimed at the side panel, not vertical scrubbing', () => {
+    const rect = { right: 1200, top: 200, bottom: 600 };
+    assert.equal(isAimingAtPopover({ x: 1230, y: 400 }, { x: 1222, y: 400 }, rect), true);
+    assert.equal(isAimingAtPopover({ x: 1230, y: 400 }, { x: 1220, y: 425 }, rect), true);
+    // Moving right (away) or mostly vertical on the ladder should not freeze.
+    assert.equal(isAimingAtPopover({ x: 1230, y: 400 }, { x: 1238, y: 400 }, rect), false);
+    assert.equal(isAimingAtPopover({ x: 1230, y: 400 }, { x: 1229, y: 420 }, rect), false);
+    assert.equal(isAimingAtPopover({ x: 1230, y: 400 }, { x: 1228, y: 440 }, rect), false);
+    // Heading leftward but aimed well above/below the popover.
+    assert.equal(isAimingAtPopover({ x: 1260, y: 200 }, { x: 1250, y: 155 }, rect), false);
+    // Already inside the popover.
+    assert.equal(isAimingAtPopover({ x: 1180, y: 400 }, { x: 1170, y: 400 }, rect), false);
+  });
+
+  test('railPeekRange centers a fixed-size window and clamps cleanly at both ends', () => {
+    assert.deepEqual(railPeekRange(0, 0), { start: 0, end: 0 });
+    assert.deepEqual(railPeekRange(2, 4), { start: 0, end: 4 });
+    assert.deepEqual(railPeekRange(0, 20), { start: 0, end: 5 });
+    assert.deepEqual(railPeekRange(1, 20), { start: 0, end: 5 });
+    assert.deepEqual(railPeekRange(10, 20), { start: 8, end: 13 });
+    assert.deepEqual(railPeekRange(18, 20), { start: 15, end: 20 });
+    assert.deepEqual(railPeekRange(19, 20), { start: 15, end: 20 });
+  });
+
   test('the page has the rail and Collapse all', async () => {
     const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
-    for (const id of ['channel-rail', 'rail-ticks', 'rail-popover', 'rail-heading', 'rail-filter', 'rail-list', 'btn-collapse-all']) {
+    for (const id of ['channel-rail', 'rail-ticks', 'rail-popover', 'rail-heading', 'rail-filter', 'rail-list', 'rail-expand', 'btn-collapse-all']) {
       assert.match(html, new RegExp(`id="${id}"`), id);
     }
   });

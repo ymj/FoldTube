@@ -1995,7 +1995,7 @@ body.has-rail .controls-bar {
   position: fixed;
   /* Under the controls bar and its menus. */
   z-index: 97;
-  right: 14px;
+  right: 10px;
   top: 54%;
   transform: translateY(-50%);
   display: flex;
@@ -2007,16 +2007,19 @@ body.has-rail .controls-bar {
 }
 
 .rail-ticks {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 9px;
+  width: 40px;
+  box-sizing: border-box;
   padding: 14px 6px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: none;
   cursor: pointer;
-  transition: opacity 0.15s ease;
 }
 
 .rail-ticks:focus-visible {
@@ -2025,25 +2028,32 @@ body.has-rail .controls-bar {
 }
 
 .tick {
-  width: 12px;
+  width: calc(12px + var(--wave, 0) * 16px);
   height: 2.5px;
   border-radius: 2px;
-  background: var(--rail-tick);
-  transition: width 0.15s ease, background 0.15s ease;
+  background: color-mix(in srgb, var(--text-primary) calc(var(--wave, 0) * 100%), var(--rail-tick));
+  transition: width 0.18s ease, background-color 0.18s ease;
+  pointer-events: none;
+}
+
+.rail-ticks.scrubbing .tick {
+  transition: none;
 }
 
 .tick.active {
-  width: 22px;
-  background: var(--text-primary);
+  width: max(22px, calc(12px + var(--wave, 0) * 16px));
+  background: var(--accent-color);
 }
 
 .rail-popover {
   position: absolute;
-  right: 0;
+  z-index: 1;
+  right: calc(100% + 10px);
   top: 50%;
   display: flex;
   flex-direction: column;
   width: 245px;
+  box-sizing: border-box;
   max-height: min(460px, 80vh);
   padding: 8px;
   border: 1px solid var(--rail-popover-border);
@@ -2053,20 +2063,99 @@ body.has-rail .controls-bar {
   box-shadow: 0 16px 40px rgb(0 0 0 / 0.35);
   opacity: 0;
   visibility: hidden;
+  pointer-events: none;
   transform: translate(8px, -50%);
   transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1), transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.16s;
+}
+
+/* Invisible hover bridge across the gap between the popover and the ladder. */
+.rail-popover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 100%;
+  width: 12px;
 }
 
 .channel-rail.open .rail-popover {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
   transform: translate(0, -50%);
   /* Visible at once, so focus can move in. */
   transition-property: opacity, transform;
 }
 
-.channel-rail.open .rail-ticks {
+.channel-rail.open .rail-popover.expanding-start {
+  overflow: hidden;
+  transition: none;
+}
+
+.channel-rail.open .rail-popover.expanding {
+  overflow: hidden;
+  will-change: height;
+  transition: height 0.65s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1), transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rail-chrome {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.rail-chrome-inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.channel-rail.peek .rail-chrome,
+.channel-rail.open .rail-popover.expanding-start .rail-chrome {
+  grid-template-rows: 0fr;
   opacity: 0;
+}
+
+.channel-rail.open .rail-popover.expanding .rail-chrome {
+  transition: grid-template-rows 0.65s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease 0.08s;
+}
+
+.channel-rail.peek .rail-letter,
+.channel-rail.peek .rail-item.peek-hidden {
+  display: none;
+}
+
+.channel-rail.peek .rail-list {
+  overflow-y: hidden;
+}
+
+.rail-expand {
+  display: none;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 10px 4px;
+  border: none;
+  border-top: 1px solid var(--rail-popover-border);
+  border-radius: 0 0 6px 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+}
+
+.channel-rail.peek .rail-expand {
+  display: block;
+}
+
+.rail-expand:hover,
+.rail-expand:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  outline: none;
 }
 
 .rail-heading {
@@ -2102,6 +2191,8 @@ body.has-rail .controls-bar {
 
 .rail-list {
   position: relative;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -2123,10 +2214,13 @@ body.has-rail .controls-bar {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 6px 10px 3px;
-  background: var(--surface-color);
-  font-size: 0.68rem;
+  padding: 8px 10px 4px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--rail-popover-border);
+  background: var(--rail-popover-bg);
+  font-size: 0.65rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
 }
 
@@ -2152,6 +2246,14 @@ body.has-rail .controls-bar {
   display: none;
 }
 
+.rail-item.active {
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent-color);
+}
+
+.rail-item.preview,
 .rail-item:hover,
 .rail-item:focus-visible {
   background: var(--surface-hover);
@@ -2159,10 +2261,19 @@ body.has-rail .controls-bar {
   outline: none;
 }
 
-.rail-item.active {
-  background: var(--surface-hover);
+.rail-item.active.preview,
+.rail-item.active:hover,
+.rail-item.active:focus-visible {
+  background: color-mix(in srgb, var(--accent-color) 18%, var(--surface-hover));
   color: var(--text-primary);
-  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tick,
+  .rail-popover,
+  .rail-chrome {
+    transition: none;
+  }
 }
 
 .rail-item-name {
