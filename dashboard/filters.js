@@ -149,11 +149,64 @@ export const RAIL_MAX_TICKS = 18;
 export const RAIL_FILTER_OVER = 10;
 /** Channels before the list gets letter dividers (in the name orders). */
 export const RAIL_LETTERS_FROM = 100;
+/** Channels shown in the compact hover peek before expanding to the full list. */
+export const RAIL_PEEK_SIZE = 5;
+/** Channels before hover starts in the compact peek instead of the full list. */
+export const RAIL_PEEK_OVER = 11;
 
 /** The tick that lights for the channel at `index` of `total`. */
 export function railTick(index, total, max = RAIL_MAX_TICKS) {
   if (total <= max) return index;
   return Math.round((index / (total - 1)) * (max - 1));
+}
+
+/** The channel index at normalized pointer position `ratio` (0..1) along the rail. */
+export function railChannelAt(ratio, total) {
+  if (total <= 0) return -1;
+  if (total === 1) return 0;
+  const clamped = Math.max(0, Math.min(1, ratio));
+  return Math.round(clamped * (total - 1));
+}
+
+/** Smooth raised-cosine wave weight (0..1) for each tick given pointer `ratio` (0..1). */
+export function railWaveWeights(tickCount, ratio, radius = 2.5) {
+  if (tickCount <= 0) return [];
+  if (tickCount === 1) return [1];
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const pos = clamped * (tickCount - 1);
+  return Array.from({ length: tickCount }, (_, i) => {
+    const d = Math.abs(i - pos);
+    if (d >= radius) return 0;
+    return 0.5 * (1 + Math.cos((Math.PI * d) / radius));
+  });
+}
+
+/**
+ * True when pointer motion from `prev` to `curr` is heading leftward toward
+ * the popover beside the rail, so diagonal movement doesn't shift the previewed
+ * channel right before reaching the list.
+ */
+export function isAimingAtPopover(prev, curr, targetRect, margin = 16) {
+  if (!prev || !curr || !targetRect) return false;
+  const dx = curr.x - prev.x;
+  if (dx > -2 || prev.x <= targetRect.right) return false;
+  const dy = curr.y - prev.y;
+  if (Math.abs(dy) > -dx * 5) return false;
+  const distToEdge = prev.x - targetRect.right;
+  const projectedY = prev.y + (dy / -dx) * distToEdge;
+  return projectedY >= targetRect.top - margin && projectedY <= targetRect.bottom + margin;
+}
+
+/**
+ * Inclusive start, exclusive end of the compact peek slice centered on `centerIndex`.
+ */
+export function railPeekRange(centerIndex, total, size = RAIL_PEEK_SIZE) {
+  if (total <= 0) return { start: 0, end: 0 };
+  if (total <= size) return { start: 0, end: total };
+  const clamped = Math.max(0, Math.min(total - 1, centerIndex));
+  const half = Math.floor(size / 2);
+  const start = Math.max(0, Math.min(total - size, clamped - half));
+  return { start, end: start + size };
 }
 
 /** The letter a channel is listed under: accents folded (É → E), '#' for numbers and symbols. */
