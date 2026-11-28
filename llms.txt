@@ -1,0 +1,22 @@
+# FoldTube
+
+> FoldTube is a free, open-source browser extension for Chrome, Brave, Edge and Firefox. One click saves every open YouTube tab (videos, Shorts and live streams) to a private, searchable dashboard and closes the tabs. Everything stays on your device: no account, no servers, no ads, no tracking.
+
+## What it does
+
+- Fold: one click (or a keyboard shortcut) saves and closes every open YouTube video tab. Other tabs, including YouTube's home page, search and playlists, are left alone.
+- Resume: opening a saved video picks up where you left off, then clears it from the list. Undo, or restore it from History for 90 days.
+- Find: search titles and channels, filter to Videos or Shorts and by length, and sort by date saved, length or title.
+- Organize: group by channel with a jump bar, or by Videos and Shorts; grid or list layout; light, dark or system theme.
+- Bulk actions: select videos to open or clear several at once.
+- Backup: export your list as JSON or an HTML bookmarks page, and import a JSON backup on another computer.
+
+## Install
+
+- [Chrome Web Store (Chrome, Brave, Edge and other Chromium browsers)](https://chromewebstore.google.com/detail/foldtube-youtube-tab-mana/phkhokoagdgofaaofmecfaibcnnahhoh)
+- [Firefox Add-ons (Firefox 142+)](https://addons.mozilla.org/en-US/firefox/addon/foldtube-youtube-tab-manager/)
+
+## More
+
+- [Privacy policy](https://foldtube.app/privacy.html): what the extension stores and why; nothing leaves your browser.
+- [Source code (MIT)](https://github.com/ymj/FoldTube)
