@@ -30,10 +30,12 @@ export function scrapeYouTubeTab() {
   const titleShortEl = document.querySelector('ytd-reel-video-renderer[is-active] h2.title')
     || document.querySelector('ytd-reel-player-header-renderer[is-active] h2.title');
 
-  if (titleVideoEl && titleVideoEl.textContent.trim()) {
-    title = titleVideoEl.textContent.trim();
-  } else if (titleShortEl && titleShortEl.textContent.trim()) {
-    title = titleShortEl.textContent.trim();
+  // YouTube keeps the page you came from in the DOM, hidden: on Shorts, a
+  // watch page heading may still be there with the earlier video's title.
+  // So only this page's kind counts.
+  const headingEl = isShort ? titleShortEl : titleVideoEl;
+  if (headingEl && headingEl.textContent.trim()) {
+    title = headingEl.textContent.trim();
   } else if (document.title) {
     // The tab title, minus YouTube's unread count: "(3) Title - YouTube".
     title = document.title.replace(/^\(\d+\+?\)\s+/, '');
@@ -53,7 +55,8 @@ export function scrapeYouTubeTab() {
   // Only the active Short's: the feed keeps its neighbours in the page.
   const channelShortEl = document.querySelector('ytd-reel-player-header-renderer[is-active] ytd-channel-name a');
   
-  const finalChannelEl = isShort ? (channelShortEl || channelVideoEl) : (channelVideoEl || channelShortEl);
+  // As with the title: only this page's kind (a hidden watch page may linger).
+  const finalChannelEl = isShort ? channelShortEl : channelVideoEl;
 
   if (finalChannelEl) {
     channelName = finalChannelEl.textContent.trim();
@@ -73,6 +76,7 @@ export function scrapeYouTubeTab() {
 
   let durationSeconds = 0;
   let durationFormatted = '';
+  let durationSource = null;
 
   if (!isShort) {
     // The meta tag shows the real duration even during an ad (the player UI
@@ -96,8 +100,10 @@ export function scrapeYouTubeTab() {
       }
     }
 
-    // Fallback: read the player UI (may be wrong during ads, but better than nothing)
+    // Fallback: read the player UI. During an ad it shows the ad's length;
+    // the worker drops it then (it knows from the player whether one plays).
     if (!durationSeconds) {
+      durationSource = 'player-ui';
       const durationEl = document.querySelector('span.ytp-time-duration');
       durationFormatted = durationEl ? durationEl.textContent.trim() : '';
 
@@ -127,6 +133,7 @@ export function scrapeYouTubeTab() {
     thumbnailUrl,
     durationSeconds,
     durationFormatted,
+    ...(durationSource && { durationSource }),
     description,
     dateSaved: new Date().toISOString(),
     metadataSource: 'scrape'

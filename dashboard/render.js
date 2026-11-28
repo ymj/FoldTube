@@ -271,6 +271,7 @@ function createCard(video, index) {
   card.tabIndex = 0;
   card.setAttribute('role', 'article');
   card.setAttribute('aria-label', video.title || 'Untitled video');
+  card.setAttribute('aria-description', 'Press Enter to open');
   card.style.animationDelay = `${Math.min(index * 0.04, 0.4)}s`;
 
   const date = new Date(video.dateSaved).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });

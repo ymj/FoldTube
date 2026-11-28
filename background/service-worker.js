@@ -255,7 +255,13 @@ async function scrapeTab(tab) {
     if (realDuration > 0) {
       metadata.durationSeconds = realDuration;
       metadata.durationFormatted = formatDuration(realDuration);
+    } else if (player?.adShowing && metadata.durationSource === 'player-ui') {
+      // The page's player shows the ad's length, not the video's: better
+      // unknown (filled in later with an API key) than wrong.
+      metadata.durationSeconds = 0;
+      metadata.durationFormatted = '';
     }
+    delete metadata.durationSource;
   } catch (_) { /* the player read is best-effort */ }
   const { seconds, source } = positionFromPlayer(metadata, player);
   metadata.timestampSeconds = seconds;
@@ -285,7 +291,11 @@ const enqueueFold = createSerialQueue();
 function processAndSaveTabs(tabs) {
   if (!tabs || tabs.length === 0) return Promise.resolve({ closed: 0, leftOpen: 0, saved: 0, saveFailed: false });
   return enqueueFold(async () => {
-    const result = await foldTabs(tabs, { readTab: scrapeTab, save: saveFoldedVideos, closeTab: closeFoldedTab });
+    // These tabs were listed before this fold waited its turn: a fold just
+    // before may have closed some. Fold the ones still open, as they are now.
+    const current = (await Promise.all(tabs.map(t => chrome.tabs.get(t.id).catch(() => null)))).filter(Boolean);
+    if (current.length === 0) return { closed: 0, leftOpen: 0, saved: 0, saveFailed: false };
+    const result = await foldTabs(current, { readTab: scrapeTab, save: saveFoldedVideos, closeTab: closeFoldedTab });
     // Fill in channel (and, with an API key, duration) for URL-only entries.
     if (result.saved > 0) fillInMetadata();
     return result;

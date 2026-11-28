@@ -47,6 +47,27 @@ describe('scrapeYouTubeTab', () => {
     assert.equal(scrapeYouTubeTab().title, 'Active one');
   });
 
+  test("on a Short, a hidden watch page left in the DOM doesn't give the title or channel", () => {
+    page({
+      url: 'https://www.youtube.com/shorts/abc',
+      title: 'The Short - YouTube',
+      elements: {
+        'ytd-watch-metadata h1': text('Earlier video'),
+        'ytd-video-owner-renderer ytd-channel-name a': { textContent: 'Earlier channel', href: 'https://www.youtube.com/@earlier' },
+      },
+    });
+    const v = scrapeYouTubeTab();
+    assert.equal(v.title, 'The Short');
+    assert.notEqual(v.channelName, 'Earlier channel');
+  });
+
+  test("a length read from the player's display is marked, so an ad's can be dropped", () => {
+    page({ url: 'https://www.youtube.com/watch?v=abc', elements: { 'span.ytp-time-duration': text('0:15') } });
+    const v = scrapeYouTubeTab();
+    assert.equal(v.durationSeconds, 15);
+    assert.equal(v.durationSource, 'player-ui');
+  });
+
   test('the duration meta tag counts only when it names this video', () => {
     const elements = { 'meta[itemprop="duration"]': meta('PT4M5S'), 'meta[itemprop="identifier"], meta[itemprop="videoId"]': meta('old') };
     page({ url: 'https://www.youtube.com/watch?v=new', elements });

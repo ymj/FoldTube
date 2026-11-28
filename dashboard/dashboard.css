@@ -920,9 +920,11 @@ a.channel:hover {
   opacity: 1;
 }
 
+/* Focus is a ring outside the card, so it reads apart from the selected
+   outline (2px, on the card's edge). */
 .video-card:focus-visible {
-  outline: 2px solid var(--selection-color);
-  outline-offset: 2px;
+  outline: 2px solid var(--text-primary);
+  outline-offset: 3px;
 }
 
 .video-card.selected {
