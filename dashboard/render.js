@@ -55,7 +55,30 @@ export function updateSelectionBar() {
 }
 
 // ---- Library ----
+
+// A redraw replaces every card. Keep keyboard focus where it was: on the same
+// card, or when that one is gone (opened, removed), the next one.
+function focusedCardIds() {
+  const focused = document.activeElement?.closest?.('.video-card');
+  if (!focused) return null;
+  const cards = [...document.querySelectorAll('#videos-section .video-card, #shorts-section .video-card')];
+  const at = cards.indexOf(focused);
+  return cards.slice(at).concat(cards.slice(0, at).reverse()).map(c => c.dataset.id);
+}
+
+function restoreCardFocus(ids) {
+  if (!ids) return;
+  for (const id of ids) {
+    const card = document.querySelector(`.video-card[data-id="${CSS.escape(id)}"]`);
+    if (card && !card.closest('.collapsed')) {
+      card.focus({ preventScroll: true });
+      return;
+    }
+  }
+}
+
 export function renderLibrary() {
+  const keepFocus = focusedCardIds();
   try {
     const videos = visibleVideos();
     const total = state.videos.length;
@@ -116,6 +139,7 @@ export function renderLibrary() {
       shortsGrid.replaceChildren();
       updateCollapseAll();
       renderRail(groups);
+      restoreCardFocus(keepFocus);
       return;
     }
     const { standard, shorts } = splitByType(videos);
@@ -126,6 +150,7 @@ export function renderLibrary() {
     shortsGrid.replaceChildren(...shorts.map((video, i) => createCard(video, i)));
     updateCollapseAll();
     renderRail([]);
+    restoreCardFocus(keepFocus);
   } catch (err) {
     console.error('Render error:', err);
     // Still on the loading placeholders: say so rather than load forever.
@@ -242,6 +267,10 @@ function createCard(video, index) {
   card.className = 'video-card';
   if (selected) card.classList.add('selected');
   card.dataset.id = video.videoId;
+  // Reachable with Tab; Enter or Space acts as a click (see controls.js).
+  card.tabIndex = 0;
+  card.setAttribute('role', 'article');
+  card.setAttribute('aria-label', video.title || 'Untitled video');
   card.style.animationDelay = `${Math.min(index * 0.04, 0.4)}s`;
 
   const date = new Date(video.dateSaved).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -297,11 +326,17 @@ function createCard(video, index) {
   title.textContent = video.title || '';
   cardContent.appendChild(title);
 
-  const channel = document.createElement('a');
-  channel.href = isYouTubeUrl(video.channelUrl) ? video.channelUrl : '#';
+  // A link only with a channel page to go to. Without one (saved from a
+  // link, or a closed window), plain text: a "#" link opened a second
+  // dashboard.
+  const hasChannelPage = isYouTubeUrl(video.channelUrl);
+  const channel = document.createElement(hasChannelPage ? 'a' : 'span');
   channel.className = 'channel';
-  channel.target = '_blank';
-  channel.rel = 'noopener noreferrer';
+  if (hasChannelPage) {
+    channel.href = video.channelUrl;
+    channel.target = '_blank';
+    channel.rel = 'noopener noreferrer';
+  }
   channel.textContent = video.channelName || '';
   cardContent.appendChild(channel);
 

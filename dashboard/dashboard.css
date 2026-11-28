@@ -339,7 +339,7 @@ body {
   margin-bottom: 4px;
 }
 
-.channel:hover {
+a.channel:hover {
   color: var(--text-primary);
 }
 
@@ -914,8 +914,15 @@ body {
 }
 
 .video-card:hover .card-checkbox,
-.card-checkbox:checked {
+.video-card:focus-visible .card-checkbox,
+.card-checkbox:checked,
+.card-checkbox:focus-visible {
   opacity: 1;
+}
+
+.video-card:focus-visible {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 2px;
 }
 
 .video-card.selected {

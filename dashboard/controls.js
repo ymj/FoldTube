@@ -595,6 +595,14 @@ function bindCards() {
       setCardSelected(e.target.closest('.video-card'), e.target.checked);
     });
 
+    // A focused card: Enter or Space does what a click does (open it, or tick
+    // it while some are selected). Keys on its own controls stay theirs.
+    grid.addEventListener('keydown', (e) => {
+      if ((e.key !== 'Enter' && e.key !== ' ') || !e.target.classList.contains('video-card')) return;
+      e.preventDefault();
+      e.target.click();
+    });
+
     grid.addEventListener('click', (e) => {
       const action = e.target.closest('.group-action');
       if (action) {
@@ -616,7 +624,7 @@ function bindCards() {
       if (!card || card.classList.contains('card-exit')) return;
       const video = state.videos.find(v => v.videoId === card.dataset.id);
       if (!video) return;
-      if (e.target.classList.contains('channel') || e.target.classList.contains('card-checkbox')) return;
+      if (e.target.closest('a.channel') || e.target.classList.contains('card-checkbox')) return;
       if (e.target.classList.contains('delete-btn')) {
         deleteSingleVideo(video, card);
       } else if (state.selected.size > 0) {

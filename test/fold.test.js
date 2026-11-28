@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { foldTabs } from '../lib/fold.js';
+import { foldTabs, stillShowsVideo } from '../lib/fold.js';
 import { mergeVideos } from '../lib/youtube.js';
 
 const tab = (id, videoId, extra = {}) => ({
@@ -25,9 +25,9 @@ function fakeBrowser({ savedVideos = [], readTab, save, closeTab } = {}) {
       if (save) await save(videos);
       state.savedVideos = mergeVideos(videos, state.savedVideos).merged;
     },
-    closeTab: async (id) => {
+    closeTab: async (id, videoId) => {
       state.log.push(`close:${id}`);
-      if (closeTab) await closeTab(id);
+      if (closeTab) await closeTab(id, videoId);
       state.open.delete(id);
     },
   };
@@ -35,6 +35,27 @@ function fakeBrowser({ savedVideos = [], readTab, save, closeTab } = {}) {
 }
 
 describe('foldTabs', () => {
+  test('each tab is closed with the video saved from it, so the closer can check', async () => {
+    const tabs = [tab(1, 'aaa'), tab(2, 'bbb')];
+    const asked = [];
+    const b = fakeBrowser({ closeTab: async (id, videoId) => { asked.push([id, videoId]); } });
+    await foldTabs(tabs, b.deps);
+    assert.deepEqual(asked, [[1, 'aaa'], [2, 'bbb']]);
+  });
+
+  test('a tab that moved on during the fold stays open, still saved', async () => {
+    const tabs = [tab(1, 'aaa'), tab(2, 'bbb')];
+    // Tab 2 now shows another site: the closer refuses, as the worker's does.
+    const now = { 1: { url: 'https://www.youtube.com/watch?v=aaa' }, 2: { url: 'https://example.com/' } };
+    const b = fakeBrowser({
+      closeTab: async (id, videoId) => { if (!stillShowsVideo(now[id], videoId)) throw new Error('moved on'); },
+    });
+    b.openAll(tabs);
+    const result = await foldTabs(tabs, b.deps);
+    assert.deepEqual(result, { closed: 1, leftOpen: 1, saved: 2, saveFailed: false });
+    assert.deepEqual([...b.state.open], [2]);
+  });
+
   test('fold 5 tabs: all 5 saved, all 5 closed', async () => {
     const tabs = [1, 2, 3, 4, 5].map(n => tab(n, `v${n}`));
     const b = fakeBrowser();
@@ -132,5 +153,22 @@ describe('foldTabs', () => {
     assert.equal(result.closed, 3, 'a duplicate tab is still closed: its video is saved');
     assert.deepEqual(b.state.savedVideos.map(v => v.videoId), ['a', 'old1', 'b']);
     assert.equal(b.state.savedVideos.find(v => v.videoId === 'b').title, 'kept');
+  });
+});
+
+describe('stillShowsVideo', () => {
+  test('the same video, in any YouTube form', () => {
+    assert.equal(stillShowsVideo({ url: 'https://www.youtube.com/watch?v=abc&t=10' }, 'abc'), true);
+    assert.equal(stillShowsVideo({ url: 'https://www.youtube.com/watch?list=L&v=abc' }, 'abc'), true);
+    assert.equal(stillShowsVideo({ url: 'https://m.youtube.com/shorts/abc/' }, 'abc'), true);
+  });
+
+  test('moved on: another video, another site, unknown, or on its way elsewhere', () => {
+    assert.equal(stillShowsVideo({ url: 'https://www.youtube.com/watch?v=xyz' }, 'abc'), false);
+    assert.equal(stillShowsVideo({ url: 'https://example.com/watch?v=abc' }, 'abc'), false);
+    assert.equal(stillShowsVideo({}, 'abc'), false, 'no URL: not a page FoldTube can see any more');
+    assert.equal(stillShowsVideo(null, 'abc'), false);
+    assert.equal(stillShowsVideo({ url: 'https://www.youtube.com/watch?v=abc', pendingUrl: 'https://example.com/' }, 'abc'), false);
+    assert.equal(stillShowsVideo({ url: 'https://www.youtube.com/watch?v=abc', pendingUrl: 'https://www.youtube.com/watch?v=abc&t=5' }, 'abc'), true);
   });
 });
