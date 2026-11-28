@@ -3,7 +3,7 @@
 //
 //   state.js    what the dashboard is showing right now
 //   store.js    reading and changing storage
-//   filters.js  search, length filter and sort (pure)
+//   filters.js  search, media-type and length filters, and sort (pure)
 //   render.js   drawing the page from state
 //   controls.js everything the user clicks or types
 

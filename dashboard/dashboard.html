@@ -15,7 +15,7 @@
       <img src="../icons/icon128.png" alt="FoldTube Icon" style="width: 28px; height: 28px; object-fit: contain;">
       <h1 style="margin: 0;">FoldTube</h1>
     </div>
-    <div class="header-controls" style="display: flex; align-items: center;">
+    <div class="header-controls">
       <span class="video-count">0 items</span>
       <button id="btn-history" class="history-btn" title="Videos you opened or removed">
         <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -52,6 +52,37 @@
 
   <div id="controls-bar" class="controls-bar">
     <input type="search" id="search-input" placeholder="Search saved videos..." />
+    <div class="menu-picker" id="filter-picker">
+      <button type="button" class="filter-trigger" id="filter-button" aria-haspopup="menu" aria-expanded="false" aria-controls="filter-menu" aria-label="Filters" title="Filters">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        </svg>
+        <span class="filter-count hidden" id="filter-count" aria-hidden="true"></span>
+      </button>
+      <div class="picker-menu filter-menu hidden" id="filter-menu" role="menu" aria-label="Filters">
+        <div role="group" id="media-filters" aria-label="Media type">
+          <div class="picker-menu-heading" aria-hidden="true">Media type</div>
+          <button type="button" role="menuitemradio" data-media="all" aria-checked="true">All</button>
+          <button type="button" role="menuitemradio" data-media="video" aria-checked="false">Videos</button>
+          <button type="button" role="menuitemradio" data-media="short" aria-checked="false">Shorts</button>
+        </div>
+        <div class="picker-menu-divider" role="separator"></div>
+        <div role="group" id="duration-filters" aria-label="Length">
+          <div class="picker-menu-heading" aria-hidden="true">Length</div>
+          <button type="button" role="menuitemradio" data-all="true" aria-checked="true">All</button>
+          <button type="button" role="menuitemradio" data-min="0" data-max="300" aria-checked="false">Under 5 min</button>
+          <button type="button" role="menuitemradio" data-min="300" data-max="900" aria-checked="false">5–15 min</button>
+          <button type="button" role="menuitemradio" data-min="900" data-max="1800" aria-checked="false">15–30 min</button>
+          <button type="button" role="menuitemradio" data-min="1800" data-max="3600" aria-checked="false">30–60 min</button>
+          <button type="button" role="menuitemradio" data-min="3600" data-max="999999" aria-checked="false">Over 60 min</button>
+        </div>
+        <div id="filter-menu-footer" class="hidden">
+          <div class="picker-menu-divider" role="separator"></div>
+          <button type="button" role="menuitem" id="btn-clear-filters">Clear filters</button>
+        </div>
+      </div>
+    </div>
     <div class="sort-control">
       <div class="menu-picker" id="sort-picker">
         <button type="button" class="picker-button" id="sort-button" aria-haspopup="menu" aria-expanded="false" aria-controls="sort-menu">
@@ -135,14 +166,8 @@
         </svg>
       </button>
     </div>
-    <div class="duration-filters" id="duration-filters">
-      <button class="filter-pill active" data-all="true">All</button>
-      <button class="filter-pill" data-min="0" data-max="300">Under 5 min</button>
-      <button class="filter-pill" data-min="300" data-max="900">5–15 min</button>
-      <button class="filter-pill" data-min="900" data-max="1800">15–30 min</button>
-      <button class="filter-pill" data-min="1800" data-max="3600">30–60 min</button>
-      <button class="filter-pill" data-min="3600" data-max="999999">Over 60 min</button>
-    </div>
+    <div class="active-filters hidden" id="active-filters" role="group" aria-label="Active filters"></div>
+    <span id="filter-status" class="visually-hidden" role="status"></span>
   </div>
 
   <main class="main-content">
@@ -203,7 +228,7 @@
 
     <div id="no-results" class="empty-state hidden">
       <h2>No matches</h2>
-      <p>Try a different search or length filter.</p>
+      <p>Try a different search or filter.</p>
     </div>
 
     <div id="videos-section" class="section hidden">
@@ -255,7 +280,7 @@
     <div class="history-controls">
       <input type="search" id="history-search" placeholder="Search history..." aria-label="Search history" />
     </div>
-    <div id="history-filters" class="duration-filters history-filters" role="group" aria-label="Show">
+    <div id="history-filters" class="history-filters" role="group" aria-label="Show">
       <button class="history-pill" data-filter="all" aria-pressed="true">All<span class="pill-count"></span></button>
       <button class="history-pill" data-filter="watched" aria-pressed="false">Watched<span class="pill-count"></span></button>
       <button class="history-pill" data-filter="deleted" aria-pressed="false">Deleted<span class="pill-count"></span></button>

@@ -1,4 +1,4 @@
-// What the library grid shows: search, length filter and sort.
+// What the library grid shows: search, media-type and length filters, and sort.
 //
 // This file is pure: no browser APIs, so the tests import it directly.
 
@@ -35,6 +35,21 @@ export function parseSort(sort) {
   return SORT_FIELDS[field] && SORT_FIELDS[field].label[direction] ? { field, direction } : { field: 'date', direction: 'desc' };
 }
 
+/** The media-type filter's choices. */
+export const MEDIA_FILTERS = ['all', 'video', 'short'];
+
+/**
+ * True when a video matches the media-type filter. Anything other than a Short
+ * counts as a Video, matching splitByType.
+ * @param {object} video
+ * @param {'all' | 'video' | 'short'} [media]
+ */
+export function matchesMedia(video, media = 'all') {
+  if (media === 'video') return video.videoType !== 'short';
+  if (media === 'short') return video.videoType === 'short';
+  return true;
+}
+
 /**
  * True when a video's length is in the range. An unknown length counts as 0.
  * @param {object} video
@@ -50,10 +65,10 @@ export function matchesDuration(video, range) {
  * The library as the grid shows it: searched, filtered, then sorted.
  * The list passed in is never changed.
  * @param {object[]} videos the library (active records)
- * @param {{ query?: string, duration?: { min: number, max: number } | null, sort?: string }} [view]
+ * @param {{ query?: string, duration?: { min: number, max: number } | null, media?: 'all' | 'video' | 'short', sort?: string }} [view]
  */
-export function libraryView(videos, { query = '', duration = null, sort = 'date-desc' } = {}) {
-  const list = videos.filter(v => matchesSearch(v, query) && matchesDuration(v, duration));
+export function libraryView(videos, { query = '', duration = null, media = 'all', sort = 'date-desc' } = {}) {
+  const list = videos.filter(v => matchesSearch(v, query) && matchesDuration(v, duration) && matchesMedia(v, media));
   const compare = SORTS[sort];
   return compare ? list.sort(compare) : list;
 }
@@ -122,6 +137,13 @@ export function videosInGroup(videos, id) {
 export function selectableIn(videos, groupBy, collapsed) {
   if (groupBy === 'none') return videos;
   return videos.filter(v => !collapsed.has(groupId(channelKey(v))));
+}
+
+/** Keep only selected ids that are still shown (not filtered out or in a collapsed group). */
+export function visibleSelection(selected, videos, groupBy, collapsed) {
+  if (selected.size === 0) return new Set();
+  const shown = new Set(selectableIn(videos, groupBy, collapsed).map(v => v.videoId));
+  return new Set([...selected].filter(id => shown.has(id)));
 }
 
 /**
