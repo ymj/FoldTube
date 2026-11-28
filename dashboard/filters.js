@@ -152,7 +152,7 @@ export const RAIL_LETTERS_FROM = 100;
 /** Channels shown in the compact hover peek before expanding to the full list. */
 export const RAIL_PEEK_SIZE = 5;
 /** Channels before hover starts in the compact peek instead of the full list. */
-export const RAIL_PEEK_OVER = 7;
+export const RAIL_PEEK_OVER = 11;
 
 /** The tick that lights for the channel at `index` of `total`. */
 export function railTick(index, total, max = RAIL_MAX_TICKS) {
