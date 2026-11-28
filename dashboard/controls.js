@@ -303,7 +303,8 @@ function bindSettings() {
     btn.textContent = 'Saved!';
     setTimeout(() => { btn.textContent = 'Save Key'; }, 2000);
     await clearApiError();
-    chrome.runtime.sendMessage({ action: 'runEnrichment' });
+    // Fire and forget: the lookups report through the library and the banner.
+    chrome.runtime.sendMessage({ action: 'runEnrichment' }).catch(() => {});
   });
 
   document.getElementById('btn-clear-api').addEventListener('click', async () => {
@@ -497,12 +498,12 @@ async function openShortcutSettings(hint) {
 
 // ---- Keyboard ----
 function bindKeyboard() {
-  const settingsModal = document.getElementById('settings-modal');
-  const helpModal = document.getElementById('help-modal');
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if (settingsModal.open) { settingsModal.close(); return; }
-      if (helpModal.open) { helpModal.close(); return; }
+      // An open dialog closes itself on Esc, the top one only. Closing them
+      // here too would also close Settings, or leave History, under a
+      // dialog opened on top (Clear History, import errors).
+      if (document.querySelector('dialog[open]')) return;
       // From History, Esc goes back unless it is clearing a search.
       const active = document.activeElement;
       const typing = active.tagName === 'INPUT' && !(active.id === 'history-search' && !active.value);
@@ -727,8 +728,15 @@ async function openVideos(videos) {
   })) return;
   opened.forEach(v => chrome.tabs.create({ url: openUrlFor(v), active: false }));
   const ids = opened.map(v => v.videoId);
+  let result;
+  try {
+    result = await archiveVideos(ids, 'watched');
+  } catch (err) {
+    console.error('FoldTube: could not move opened videos to History', err);
+    showMessageToast(`Opened, but couldn't move ${count === 1 ? 'it' : 'them'} to History.`);
+    return;
+  }
   deselect(ids);
-  const result = await archiveVideos(ids, 'watched');
   showUndoToast(`${count} video${count > 1 ? 's' : ''} opened & removed`, () => unarchiveVideos(result));
 }
 
@@ -743,8 +751,15 @@ async function removeVideos(videos, { ask = true } = {}) {
     ok: `Delete ${count} videos`,
   })) return;
   const ids = videos.map(v => v.videoId);
+  let result;
+  try {
+    result = await archiveVideos(ids, 'deleted');
+  } catch (err) {
+    console.error('FoldTube: could not remove videos', err);
+    showMessageToast(`Couldn't remove ${count === 1 ? 'the video' : 'the videos'}. Please try again.`);
+    return;
+  }
   deselect(ids);
-  const result = await archiveVideos(ids, 'deleted');
   showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => unarchiveVideos(result));
 }
 
@@ -920,7 +935,13 @@ async function clearHistory() {
       + `${back ? ' Videos back in your library stay there.' : ''} This can't be undone.`
     : 'Videos back in your library stay there.';
   if (!await askToConfirm({ title: 'Clear History?', detail, ok: 'Clear History' })) return;
-  await changeVideos({ type: 'clearHistory' });
+  try {
+    await changeVideos({ type: 'clearHistory' });
+  } catch (err) {
+    console.error('FoldTube: could not clear History', err);
+    // A dialog, not a toast: this may be asked from Settings, over the page.
+    askToConfirm({ title: "Couldn't clear History", detail: 'Nothing was deleted. Please try again.', ok: 'OK', cancel: false });
+  }
 }
 
 // ---- Import result ----
@@ -942,8 +963,13 @@ function bindImportResult() {
     if (!videos.length) return;
     // The same as saving them again: back in the library, still listed in
     // History as back in library.
-    const { added } = await changeVideos({ type: 'add', videos });
-    showMessageToast(`Restored ${added} video${added === 1 ? '' : 's'} to your library.`);
+    try {
+      const { added } = await changeVideos({ type: 'add', videos });
+      showMessageToast(`Restored ${added} video${added === 1 ? '' : 's'} to your library.`);
+    } catch (err) {
+      console.error('FoldTube: could not restore skipped videos', err);
+      showMessageToast("Couldn't add those videos. Please try again.");
+    }
   });
 }
 
