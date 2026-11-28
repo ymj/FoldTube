@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, railChannelAt, railWaveWeights, railPeekRange, isAimingAtPopover, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, railChannelAt, railWaveWeights, railPeekRange, isAimingAtPopover, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS, RAIL_PEEK_OVER } from '../dashboard/filters.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -259,6 +259,7 @@ describe('channel rail', () => {
   });
 
   test('railPeekRange centers a fixed-size window and clamps cleanly at both ends', () => {
+    assert.equal(RAIL_PEEK_OVER, 11, 'under 12 channels opens straight to the full list');
     assert.deepEqual(railPeekRange(0, 0), { start: 0, end: 0 });
     assert.deepEqual(railPeekRange(2, 4), { start: 0, end: 4 });
     assert.deepEqual(railPeekRange(0, 20), { start: 0, end: 5 });

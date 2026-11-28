@@ -63,6 +63,7 @@ export function renderRail(next) {
   const query = open ? filter.value : '';
   const focused = document.activeElement;
   const focusedKey = open && focused?.classList.contains('rail-item') ? groups[Number(focused.dataset.index)]?.key : undefined;
+  const hoverKey = open && hoverTarget >= 0 ? groups[hoverTarget]?.key : undefined;
   const filterFocused = open && focused === filter;
 
   groups = state.library.groupBy === 'none' ? [] : next;
@@ -132,7 +133,11 @@ export function renderRail(next) {
 
   if (open && isOpen()) {
     if (wasPeek && groups.length > RAIL_PEEK_OVER) {
-      applyPeekSlice(activeIndex >= 0 ? activeIndex : 0);
+      const hovered = hoverKey === undefined ? -1 : groups.findIndex(g => g.key === hoverKey);
+      const center = hovered >= 0 ? hovered : (activeIndex >= 0 ? activeIndex : 0);
+      hoverTarget = hovered;
+      applyPeekSlice(center);
+      if (hovered >= 0) setPreview(hovered);
     } else if (wasPeek) {
       $('channel-rail').classList.remove('peek');
       clearPeekSlice();
@@ -390,7 +395,7 @@ function closeRail({ refocus = false } = {}) {
 
 // ---- Filter ----
 
-const shownItems = () => items.filter(item => !item.hidden);
+const shownItems = () => items.filter(item => !item.hidden && !item.classList.contains('peek-hidden'));
 
 function applyFilter() {
   const query = $('rail-filter').value.trim().toLowerCase();
@@ -440,14 +445,20 @@ function jumpTo(index, { byKeyboard = false, keepOpen = false } = {}) {
   }
   if (!byKeyboard && focusInside) document.activeElement.blur();
   setActive(index);
-  // Don't let the smooth scroll light up every channel it passes. The pause
-  // lasts while the scroll does (see the scroll listener), or 1s if the page
-  // doesn't move at all.
-  jumping = true;
-  followPausedUntil = performance.now() + 1000;
-  const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Don't let the smooth scroll light up every channel it passes. Skip the
+  // pause when we're already at the destination so manual scrolling isn't held.
   const top = group.getBoundingClientRect().top + scrollY - HEADER_OVERHANG - stickyTop();
-  scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
+  const maxScroll = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+  const dest = Math.max(0, Math.min(maxScroll, top));
+  if (Math.abs(dest - scrollY) >= 2) {
+    jumping = true;
+    followPausedUntil = performance.now() + 1000;
+    const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    scrollTo({ top: dest, behavior: smooth ? 'smooth' : 'auto' });
+  } else {
+    jumping = false;
+    followPausedUntil = 0;
+  }
 }
 
 function setActive(index) {
@@ -526,8 +537,9 @@ export function bindRail() {
     timer = setTimeout(closeRail, CLOSE_DELAY);
   });
 
-  // Scrolling the mouse wheel over the ladder or peek panel expands to the full list.
-  rail.addEventListener('wheel', (e) => {
+  // Scrolling the mouse wheel inside the peek panel expands to the full list;
+  // scrolling with the cursor resting on the ladder leaves page scroll alone.
+  popover.addEventListener('wheel', (e) => {
     if (!isPeek()) return;
     e.preventDefault();
     expandRail();
@@ -597,8 +609,11 @@ export function bindRail() {
   expand.addEventListener('click', () => expandRail());
 
   ticks.addEventListener('click', (e) => {
-    // Keyboard activation (detail === 0): open and focus the full list.
-    if (e.detail === 0) {
+    // Keyboard or screen-reader synthetic activation: open and focus the full list.
+    const nonPointer = e.detail === 0
+      || ('pointerType' in e && e.pointerType === '')
+      || (e.clientX === 0 && e.clientY === 0);
+    if (nonPointer) {
       openRail({ focus: true });
       return;
     }
@@ -701,11 +716,18 @@ export function bindRail() {
   });
 
   let frame = 0;
+  // User wheel scrolling on the page immediately takes over from an in-flight jump pause.
+  addEventListener('wheel', (e) => {
+    if (!jumping || popover.contains(e.target)) return;
+    jumping = false;
+    followPausedUntil = 0;
+  }, { passive: true });
   addEventListener('scroll', () => {
     // A jump's scroll keeps the pause going; one that never moved the page
     // has already timed out, and this scroll is the user's own.
     if (jumping && performance.now() > followPausedUntil) jumping = false;
     if (jumping) followPausedUntil = performance.now() + 250;
+    else if (previewIndex !== -1) setPreview(-1);
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => followScroll());
   }, { passive: true });
