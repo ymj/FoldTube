@@ -43,7 +43,12 @@ export function showSkeletons(count = 8) {
 // Storage could not be read: show the empty state rather than nothing.
 export function showLoadFailed() {
   document.getElementById('videos-section').classList.add('hidden');
-  document.getElementById('empty-state').classList.remove('hidden');
+  document.getElementById('shorts-section').classList.add('hidden');
+  document.getElementById('controls-bar').classList.add('hidden');
+  const empty = document.getElementById('empty-state');
+  for (const copy of empty.querySelectorAll('.empty-copy, #empty-has-tabs')) copy.classList.add('hidden');
+  document.getElementById('empty-load-failed').classList.remove('hidden');
+  empty.classList.remove('hidden');
 }
 
 // ---- Selection bar ----
@@ -371,6 +376,7 @@ function createCard(video, index) {
 // follows tabs opened or closed elsewhere while the library is empty.
 export async function refreshEmptyState() {
   if (state.videos.length) return;
+  document.getElementById('empty-load-failed').classList.add('hidden');
   document.getElementById('empty-first-run').classList.toggle('hidden', state.hasSavedBefore);
   document.getElementById('empty-caught-up').classList.toggle('hidden', !state.hasSavedBefore);
 

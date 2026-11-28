@@ -24,8 +24,10 @@ export function showSavedMark(linkUrl, { added, iconUrl } = {}) {
 
   const host = document.createElement('div');
   host.id = HOST_ID;
+  // all: initial first: the page's inherited text styles (letter-spacing,
+  // uppercase, direction) would otherwise reach into the shadow root.
   Object.assign(host.style, {
-    position: 'fixed', inset: '0', zIndex: '2147483647', pointerEvents: 'none',
+    all: 'initial', position: 'fixed', inset: '0', zIndex: '2147483647', pointerEvents: 'none',
   });
   const root = host.attachShadow({ mode: 'closed' });
 
@@ -55,8 +57,11 @@ export function showSavedMark(linkUrl, { added, iconUrl } = {}) {
   pill.append(label);
 
   if (target) {
-    pill.style.left = `${Math.min(Math.max(target.left + target.width / 2, 100), innerWidth - 100)}px`;
-    pill.style.top = `${Math.min(Math.max(target.top + target.height / 2, 24), innerHeight - 24)}px`;
+    // Kept on screen, even in a frame narrower than the pill.
+    const padX = Math.min(100, innerWidth / 2);
+    const padY = Math.min(24, innerHeight / 2);
+    pill.style.left = `${Math.min(Math.max(target.left + target.width / 2, padX), innerWidth - padX)}px`;
+    pill.style.top = `${Math.min(Math.max(target.top + target.height / 2, padY), innerHeight - padY)}px`;
   } else {
     pill.style.left = '50%';
     pill.style.top = `${innerHeight - 48}px`;

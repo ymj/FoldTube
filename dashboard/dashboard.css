@@ -873,12 +873,16 @@ a.channel:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* Narrow windows: the buttons wrap below the count, not off screen. */
+  flex-wrap: wrap;
+  gap: 10px;
   z-index: 99;
   border-bottom: 1px solid var(--border-color);
 }
 
 .selection-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -1020,6 +1024,11 @@ a.channel:hover {
 
 .close-btn:hover {
   color: var(--accent-color);
+}
+
+/* On the yellow API banner: dark, like the banner's text. */
+.api-banner .close-btn {
+  color: #121212;
 }
 
 .modal-body {
@@ -1385,6 +1394,12 @@ a.channel:hover {
   opacity: 0;
   width: 0;
   height: 0;
+}
+
+/* The input itself is hidden: show keyboard focus on the switch. */
+.switch input:focus-visible + .slider {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 2px;
 }
 
 .slider {
@@ -1866,6 +1881,10 @@ input:checked+.slider:before {
 }
 
 .history-info .title {
+  /* One line with an ellipsis: not the cards' two-line clamp, nor the room
+     they keep for a delete button. */
+  display: block;
+  padding-right: 0;
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;

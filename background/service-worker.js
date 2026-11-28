@@ -21,7 +21,11 @@ function getDeviceId() {
     const id = crypto.randomUUID();
     await chrome.storage.local.set({ deviceId: id });
     return id;
-  })();
+  })().catch((err) => {
+    // A failed read isn't kept: the next change tries again.
+    deviceIdPromise = null;
+    throw err;
+  });
   return deviceIdPromise;
 }
 
@@ -203,7 +207,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const snapshot = await readTabSnapshot();
     const next = updateTabSnapshot(snapshot, tabId, tab);
     if (next !== snapshot) await writeTabSnapshot(next);
-  });
+  }).catch(e => console.error("FoldTube: tab list update failed", e));
 });
 
 // ---- Auto-collapse when a window closes ----
@@ -228,7 +232,7 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
     // Saved, or closed on purpose: no longer a candidate.
     const { [tabId]: _closed, ...rest } = snapshot;
     await writeTabSnapshot(rest);
-  });
+  }).catch(e => console.error("FoldTube: saving a closed window's tab failed", e));
 });
 
 // ---- Manual Collapse (Clicking Extension Icon) ----
@@ -325,7 +329,9 @@ async function collapseAndOpenDashboard() {
   await handleOpenDashboard();
 }
 
-chrome.action.onClicked.addListener(handleCollapse);
+chrome.action.onClicked.addListener(() => {
+  handleCollapse().catch(e => console.error("FoldTube: fold failed", e));
+});
 
 // ---- Open Dashboard (no collapse) ----
 
@@ -355,13 +361,20 @@ chrome.commands.onCommand.addListener((command) => {
   if (command === "open-dashboard") {
     handleOpenDashboard();
   } else if (command === "fold-current-tab") {
-    handleFoldCurrentTab();
+    handleFoldCurrentTab().catch(e => console.error("FoldTube: fold failed", e));
   }
 });
 
+// The shortcut on a page that isn't a YouTube video says so, rather than
+// seeming not to work.
 async function handleFoldCurrentTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true, url: YOUTUBE_TAB_PATTERNS });
-  if (tabs.length > 0) await foldOneTab(tabs[0]);
+  if (tabs.length > 0 && parseVideoUrl(tabs[0].url)) {
+    await foldOneTab(tabs[0]);
+    return;
+  }
+  flashBadge("–", BADGE_COLOR);
+  notify("foldtube-not-video", "This tab isn't a YouTube video, so there's nothing to fold.");
 }
 
 // The keyboard shortcut and the "Fold this tab" menu.
@@ -382,10 +395,11 @@ chrome.runtime.onInstalled.addListener(() => createMenus());
 chrome.runtime.onStartup.addListener(() => createMenus());
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  const failed = (e) => console.error("FoldTube: right-click action failed", e);
   if (info.menuItemId === MENU_FOLD_TAB && tab?.id !== undefined && parseVideoUrl(tab.url)) {
-    foldOneTab(tab);
+    foldOneTab(tab).catch(failed);
   } else if (info.menuItemId === MENU_SAVE_LINK) {
-    saveLink(info, tab);
+    saveLink(info, tab).catch(failed);
   }
 });
 
@@ -566,9 +580,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // respond asynchronously
   }
 
+  // Answer once the lookups are done, so the dashboard's message gets a reply
+  // and the worker stays up until they finish.
   if (request.action === "runEnrichment") {
-    fillInMetadata();
-    return;
+    fillInMetadata()
+      .then(() => sendResponse({ ok: true }))
+      .catch(e => sendResponse({ ok: false, error: String(e?.message || e) }));
+    return true; // respond asynchronously
   }
 
   if (request.action === "mutateVideos" && DASHBOARD_OPS.has(request.op?.type)) {
