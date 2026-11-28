@@ -36,7 +36,7 @@
       style="display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 1400px; margin: 0 auto;">
       <span>⚠️ There seems to be an issue validating your YouTube API Key. Please check your settings and enter a valid
         one.</span>
-      <button id="btn-dismiss-banner" class="close-btn" style="font-size: 1.2rem; padding: 0;">&times;</button>
+      <button id="btn-dismiss-banner" class="close-btn" aria-label="Dismiss" style="font-size: 1.2rem; padding: 0;">&times;</button>
     </div>
   </div>
 
@@ -153,6 +153,15 @@
               <kbd data-shortcut="_execute_action"></kbd></span></span>
           <span class="line">anytime to fold new tabs.</span>
           <span class="line">Videos you opened or removed are in History.</span>
+        </p>
+      </div>
+
+      <!-- Storage couldn't be read. -->
+      <div id="empty-load-failed" class="empty-copy hidden">
+        <h2>Couldn't load your saved videos</h2>
+        <p>
+          <span class="line">Your browser's storage couldn't be read just now.</span>
+          <span class="line">Reload this tab to try again. Nothing has been deleted.</span>
         </p>
       </div>
 

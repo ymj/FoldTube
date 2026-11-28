@@ -338,7 +338,7 @@ function bindSettings() {
       try {
         validItems = validateImport(JSON.parse(evt.target.result));
       } catch {
-        alert("Failed to parse the JSON file. Please check it's a valid FoldTube backup.");
+        askToConfirm({ title: "Couldn't read that file", detail: "Please check it's a FoldTube backup (a .json file).", ok: 'OK', cancel: false });
         e.target.value = '';
         return;
       }
@@ -348,7 +348,7 @@ function bindSettings() {
         showImportResult(result, validItems);
       } catch (err) {
         console.error('FoldTube: import failed', err);
-        alert('The backup could not be imported. Please try again.');
+        askToConfirm({ title: "Couldn't import the backup", detail: 'Nothing was changed. Please try again.', ok: 'OK', cancel: false });
       }
       e.target.value = '';
     };
@@ -520,12 +520,22 @@ let undoAction = null;
 let toastTimer = null;
 
 function bindToasts() {
-  document.getElementById('btn-undo').addEventListener('click', async () => {
-    if (undoAction) {
-      await undoAction();
-      undoAction = null;
-      clearTimeout(toastTimer);
+  // Undo runs once, however many clicks; if it fails, the toast says so.
+  const undoButton = document.getElementById('btn-undo');
+  undoButton.addEventListener('click', async () => {
+    const undo = undoAction;
+    if (!undo) return;
+    undoAction = null;
+    clearTimeout(toastTimer);
+    undoButton.disabled = true;
+    try {
+      await undo();
       document.getElementById('undo-toast').classList.remove('visible');
+    } catch (err) {
+      console.error('FoldTube: undo failed', err);
+      showMessageToast("Couldn't undo. You can restore it from History.");
+    } finally {
+      undoButton.disabled = false;
     }
   });
 }
@@ -553,10 +563,9 @@ function showMessageToast(message) {
   document.getElementById('undo-toast-msg').textContent = message;
   document.getElementById('btn-undo').hidden = true;
   toast.classList.add('visible');
-  toastTimer = setTimeout(() => {
-    toast.classList.remove('visible');
-    document.getElementById('btn-undo').hidden = false;
-  }, 4000);
+  // The Undo button stays hidden while the toast fades; showUndoToast shows
+  // it again when there's something to undo.
+  toastTimer = setTimeout(() => toast.classList.remove('visible'), 4000);
 }
 
 // ---- Search, sort and length filter ----
@@ -636,11 +645,23 @@ function bindCards() {
   }
 }
 
+// The card fades out first; if the change then fails, it comes back.
+function changeFailed(card, message) {
+  return (err) => {
+    console.error('FoldTube: could not update the library', err);
+    card.classList.remove('card-exit');
+    showMessageToast(message);
+    throw err;
+  };
+}
+
 async function deleteSingleVideo(video, card) {
   card.classList.add('card-exit');
   // Remove after the exit animation; undo waits for the removal to finish.
   const removal = new Promise(resolve => setTimeout(resolve, 300))
-    .then(() => archiveVideos([video.videoId], 'deleted'));
+    .then(() => archiveVideos([video.videoId], 'deleted'))
+    .catch(changeFailed(card, "Couldn't remove the video. Please try again."));
+  removal.catch(() => {}); // reported above; Undo sees the failure too
   const title = typeof video.title === 'string' ? video.title.trim() : '';
   const toastMsg = title
     ? `"${title.length > 40 ? title.slice(0, 40) + '…' : title}" removed`
@@ -652,7 +673,11 @@ function openSingleVideo(video, card) {
   if (!isYouTubeUrl(video.url)) return; // not a YouTube link: keep it saved, open nothing
   chrome.tabs.create({ url: openUrlFor(video) });
   card.classList.add('card-exit');
-  setTimeout(() => archiveVideos([video.videoId], 'watched'), 300);
+  setTimeout(() => {
+    archiveVideos([video.videoId], 'watched')
+      .catch(changeFailed(card, "Opened, but couldn't move it to History."))
+      .catch(() => {});
+  }, 300);
 }
 
 // ---- Bulk actions ----
@@ -712,20 +737,28 @@ async function openVideos(videos) {
 async function removeVideos(videos, { ask = true } = {}) {
   const count = videos.length;
   if (count === 0) return;
-  if (ask && count > 1 && !confirm(`Delete ${count} videos?`)) return;
+  if (ask && count > 1 && !await askToConfirm({
+    title: `Delete ${count} videos?`,
+    detail: 'They move to History for 90 days, and you can Undo right away.',
+    ok: `Delete ${count} videos`,
+  })) return;
   const ids = videos.map(v => v.videoId);
   deselect(ids);
   const result = await archiveVideos(ids, 'deleted');
   showUndoToast(`${count} video${count > 1 ? 's' : ''} removed`, () => unarchiveVideos(result));
 }
 
-/** Ask a yes/no question in a dialog. Resolves true for the OK button. */
-function askToConfirm({ title, detail, ok }) {
+/**
+ * Ask a yes/no question in a dialog. Resolves true for the OK button.
+ * With `cancel: false` it's a notice: one button, which has focus.
+ */
+function askToConfirm({ title, detail, ok, cancel = true }) {
   const modal = document.getElementById('confirm-modal');
   document.getElementById('confirm-title').textContent = title;
   document.getElementById('confirm-detail').textContent = detail;
   const okButton = document.getElementById('btn-confirm-ok');
   okButton.textContent = ok;
+  document.getElementById('btn-confirm-cancel').hidden = !cancel;
   return new Promise((resolve) => {
     const answer = (yes) => () => { modal.close(); resolve(yes); };
     const onOk = answer(true);
@@ -738,9 +771,9 @@ function askToConfirm({ title, detail, ok }) {
       document.getElementById('btn-confirm-cancel').removeEventListener('click', onCancel);
       resolve(false);
     }, { once: true });
-    // Cancel has focus first, so Enter alone doesn't open the tabs.
+    // Cancel has focus first, so Enter alone doesn't go ahead.
     modal.showModal();
-    document.getElementById('btn-confirm-cancel').focus();
+    (cancel ? document.getElementById('btn-confirm-cancel') : okButton).focus();
   });
 }
 
@@ -789,6 +822,7 @@ function bindEmptyState() {
       if (!response?.ok) throw new Error(response?.error || 'FoldTube background did not respond');
     } catch (e) {
       console.error('FoldTube: fold from the empty state failed', e);
+      showMessageToast("Couldn't fold your tabs. Try the FoldTube icon in the toolbar.");
     } finally {
       fold.disabled = false;
       refreshEmptyState(); // the list itself re-renders from storage
@@ -855,7 +889,9 @@ function bindHistory() {
     const button = e.target.closest('button[data-action]');
     const row = button?.closest('.history-row');
     if (!row) return;
-    button.disabled = true;
+    // Both of the row's buttons: Restore and Delete forever can't both run.
+    const rowButtons = [...row.querySelectorAll('button[data-action]')];
+    rowButtons.forEach(b => { b.disabled = true; });
     // Restored videos stay listed, now marked as back in the library.
     const restoring = button.dataset.action === 'restore';
     if (!restoring || history.filter !== 'all') row.classList.add('row-exit');
@@ -866,7 +902,8 @@ function bindHistory() {
       changeVideos(op).catch(err => {
         console.error('FoldTube: history change failed', err);
         row.classList.remove('row-exit');
-        button.disabled = false;
+        rowButtons.forEach(b => { b.disabled = false; });
+        showMessageToast(restoring ? "Couldn't restore the video. Please try again." : "Couldn't delete the video. Please try again.");
       });
     }, restoring ? 0 : 200);
   });
@@ -878,11 +915,11 @@ async function clearHistory() {
   if (!items.length) return;
   const gone = items.filter(v => !isActive(v)).length;
   const back = items.length - gone;
-  const message = gone
-    ? `Clear History? ${gone} video${gone === 1 ? '' : 's'} you opened or removed will be deleted forever.`
+  const detail = gone
+    ? `${gone} video${gone === 1 ? '' : 's'} you opened or removed will be deleted forever.`
       + `${back ? ' Videos back in your library stay there.' : ''} This can't be undone.`
-    : 'Clear History? Videos back in your library stay there.';
-  if (!confirm(message)) return;
+    : 'Videos back in your library stay there.';
+  if (!await askToConfirm({ title: 'Clear History?', detail, ok: 'Clear History' })) return;
   await changeVideos({ type: 'clearHistory' });
 }
 

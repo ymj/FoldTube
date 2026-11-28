@@ -231,6 +231,13 @@ describe('countFoldableTabs', async () => {
   });
 
   test('tab patterns cover videos, Shorts and live streams', () => {
-    assert.deepEqual(YOUTUBE_TAB_PATTERNS.map(p => p.split('youtube.com/')[1]), ['watch?v=*', 'shorts/*', 'live/*']);
+    // watch?* rather than watch?v=*: v isn't always the first parameter.
+    assert.deepEqual(YOUTUBE_TAB_PATTERNS.map(p => p.split('youtube.com/')[1]), ['watch?*', 'shorts/*', 'live/*']);
+  });
+
+  test('a watch page counts only with a video ID, wherever v is', () => {
+    const tabs = ['https://www.youtube.com/watch?list=L&v=abc', 'https://www.youtube.com/watch?app=desktop&v=def', 'https://www.youtube.com/watch?list=L']
+      .map(url => ({ url }));
+    assert.equal(countFoldableTabs(tabs), 2);
   });
 });
