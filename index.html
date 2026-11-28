@@ -2,9 +2,1769 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>FoldTube</title>
-  <meta http-equiv="refresh" content="0; url=https://github.com/ymj/FoldTube">
-  <link rel="canonical" href="https://github.com/ymj/FoldTube">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FoldTube — Fold YouTube tabs into one clean dashboard</title>
+  <meta name="description" content="One click folds all your open YouTube tabs into a searchable, private watch-later dashboard. Group by channel, filter by length, and pick up right where you left off. Free for Chrome and Firefox.">
+  <meta property="og:title" content="FoldTube — YouTube Tab Manager">
+  <meta property="og:description" content="One click folds all open YouTube tabs into a clean, searchable dashboard. 100% on-device, no account, no tracking.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="img/og-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#0b0c10">
+  <link rel="icon" href="icon128.png">
+  <style>
+    :root {
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      --red: #e62626;
+      --red-bright: #ff4e45;
+      --bg-dark: #0b0c10;
+      --text-dark: #f6f7f9;
+      --muted-dark: rgba(241, 243, 247, 0.72);
+      --border-dark: rgba(255, 255, 255, 0.12);
+      --text-light: #111318;
+      --muted-light: rgba(17, 19, 24, 0.66);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg-dark);
+      color: var(--text-dark);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body {
+      min-height: 100vh;
+      overflow-x: clip;
+      background: var(--bg-dark);
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ═══════════════════════════════════════════
+       Fixed Top Navigation
+       ═══════════════════════════════════════════ */
+    .top-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 clamp(18px, 4vw, 48px);
+      background: rgba(12, 13, 18, 0.72);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+
+    body.page-light .top-nav {
+      background: rgba(255, 255, 255, 0.88);
+      border-bottom-color: rgba(17, 19, 24, 0.08);
+      color: var(--text-light);
+    }
+
+    .nav-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+    }
+
+    .nav-brand img {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-link {
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0.75;
+      padding: 7px 11px;
+      border-radius: 8px;
+      transition: opacity 0.2s, background-color 0.2s;
+    }
+    .nav-link:hover { opacity: 1; background: rgba(127, 127, 127, 0.14); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      border-radius: 999px;
+      font-family: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+      white-space: nowrap;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+
+    .btn-sm {
+      padding: 8px 15px;
+      font-size: 13.5px;
+    }
+
+    .btn-lg {
+      padding: 14px 26px;
+      font-size: 16px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #e92a2a 0%, #bf1515 100%);
+      color: #ffffff;
+      border: 1px solid rgba(255, 130, 120, 0.36);
+      box-shadow: 0 8px 24px rgba(230, 38, 38, 0.34);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 12px 32px rgba(230, 38, 38, 0.48);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #f6f7f9;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+
+    body.page-light .top-nav .btn-secondary:not(.is-detected) {
+      background: rgba(17, 19, 24, 0.06);
+      color: var(--text-light);
+      border-color: rgba(17, 19, 24, 0.14);
+    }
+    body.page-light .top-nav .btn-secondary:not(.is-detected):hover {
+      background: rgba(17, 19, 24, 0.11);
+    }
+
+    .btn svg { width: 18px; height: 18px; flex: none; }
+    .btn-sm svg { width: 16px; height: 16px; }
+
+    /* Highlight user's detected browser store subtly */
+    .btn.is-detected {
+      background: linear-gradient(135deg, #e92a2a 0%, #bf1515 100%);
+      color: #ffffff !important;
+      border-color: rgba(255, 130, 120, 0.4) !important;
+      box-shadow: 0 8px 26px rgba(230, 38, 38, 0.4);
+    }
+
+    /* ═══════════════════════════════════════════
+       Hero Intro Section
+       ═══════════════════════════════════════════ */
+    .hero {
+      position: relative;
+      padding: 132px 24px 68px;
+      text-align: center;
+      background:
+        radial-gradient(960px 440px at 50% 0%, rgba(230, 34, 34, 0.22), transparent 68%),
+        radial-gradient(540px 320px at 85% 25%, rgba(62, 166, 255, 0.08), transparent 68%),
+        linear-gradient(180deg, #13151c 0%, #0b0c10 100%);
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(ellipse 80% 75% at 50% 30%, black 20%, transparent 100%);
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 2;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px 14px;
+      font-size: 13px;
+      font-weight: 550;
+      letter-spacing: 0.01em;
+      color: rgba(246, 247, 249, 0.78);
+      margin-bottom: 24px;
+    }
+
+    .hero-eyebrow-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hero-eyebrow-item svg {
+      width: 14px;
+      height: 14px;
+      color: rgba(246, 247, 249, 0.56);
+      flex: none;
+    }
+
+    .hero-eyebrow a.hero-eyebrow-item:hover {
+      color: #ffffff;
+    }
+
+    .hero-eyebrow-sep {
+      width: 1px;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4.4rem);
+      font-weight: 850;
+      line-height: 1.04;
+      letter-spacing: -0.04em;
+      margin-bottom: 20px;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #ffffff 10%, #ff7a70 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-sub {
+      font-size: clamp(1.08rem, 2.1vw, 1.32rem);
+      line-height: 1.5;
+      color: var(--muted-dark);
+      max-width: 650px;
+      margin: 0 auto 32px;
+    }
+
+    .hero-ctas {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px 20px;
+      font-size: 13.5px;
+      color: rgba(241, 243, 247, 0.56);
+    }
+
+    .scroll-cue {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin-top: 38px;
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(241, 243, 247, 0.52);
+    }
+
+    .scroll-cue .chev {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: grid;
+      place-items: center;
+      animation: bob 2s ease-in-out infinite;
+    }
+
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(5px); }
+    }
+
+    /* ═══════════════════════════════════════════
+       Scroll-Driven Animated Cinema Showcase
+       ═══════════════════════════════════════════ */
+    #story-track {
+      position: relative;
+      height: 620vh;
+    }
+
+    #story-sticky {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      width: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 84px clamp(16px, 4vw, 56px) 0;
+    }
+
+    /* Dark and light atmospheric layers that crossfade smoothly on Scene 5 */
+    .stage-bg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    #stage-bg-dark {
+      background:
+        radial-gradient(1100px 540px at 50% 108%, rgba(226, 32, 32, 0.28), transparent 65%),
+        radial-gradient(640px 360px at 14% 18%, rgba(255, 60, 48, 0.11), transparent 65%),
+        radial-gradient(680px 380px at 88% 22%, rgba(62, 166, 255, 0.08), transparent 65%),
+        linear-gradient(180deg, #0b0c10 0%, #101116 42%, #0b0c10 100%);
+    }
+
+    #stage-bg-light {
+      opacity: 0;
+      background:
+        radial-gradient(1100px 520px at 50% 106%, rgba(255, 56, 46, 0.12), transparent 65%),
+        radial-gradient(640px 340px at 12% 0%, rgba(255, 70, 56, 0.08), transparent 65%),
+        radial-gradient(700px 360px at 88% 4%, rgba(6, 95, 212, 0.08), transparent 65%),
+        linear-gradient(168deg, #ffffff 0%, #f4f5f8 52%, #ebedf2 100%);
+    }
+
+    .stage-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(ellipse 85% 75% at 50% 42%, black 25%, transparent 100%);
+    }
+
+    #stage-grid-light {
+      opacity: 0;
+      background-image:
+        linear-gradient(to right, rgba(17, 19, 24, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(17, 19, 24, 0.04) 1px, transparent 1px);
+    }
+
+    /* Chapter pills bar */
+    .chapter-nav {
+      position: relative;
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .chapter-btn {
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(241, 243, 247, 0.68);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .chapter-btn:hover {
+      background: rgba(255, 255, 255, 0.11);
+      color: #ffffff;
+    }
+    .chapter-btn.active {
+      background: rgba(230, 38, 38, 0.22);
+      border-color: rgba(255, 95, 85, 0.6);
+      color: #ffffff;
+    }
+
+    body.page-light .chapter-btn {
+      border-color: rgba(17, 19, 24, 0.12);
+      background: rgba(17, 19, 24, 0.05);
+      color: rgba(17, 19, 24, 0.65);
+    }
+    body.page-light .chapter-btn.active {
+      background: rgba(217, 38, 38, 0.12);
+      border-color: rgba(217, 38, 38, 0.45);
+      color: #b91c1c;
+    }
+
+    /* Dynamic headline above the sticky browser */
+    .stage-header {
+      position: relative;
+      z-index: 15;
+      text-align: center;
+      max-width: 920px;
+      margin-bottom: 18px;
+      min-height: 98px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    #stage-eyebrow {
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #ff6961;
+      margin-bottom: 7px;
+    }
+
+    #stage-title {
+      font-size: clamp(1.65rem, 3.2vw, 2.75rem);
+      font-weight: 820;
+      line-height: 1.08;
+      letter-spacing: -0.032em;
+      margin-bottom: 7px;
+    }
+
+    #stage-sub {
+      font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+      line-height: 1.38;
+      color: var(--muted-dark);
+    }
+
+    /* Sticky browser window */
+    #window-wrap {
+      position: relative;
+      z-index: 12;
+      width: min(1160px, 100%);
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .browser-shell {
+      position: relative;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      border-radius: 16px 16px 0 0;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-bottom: none;
+      background: #0f0f0f;
+      box-shadow:
+        0 30px 90px rgba(0, 0, 0, 0.68),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.35s ease, box-shadow 0.35s ease;
+    }
+
+    .browser-shell.is-light {
+      border-color: rgba(17, 19, 24, 0.14);
+      background: #f5f5f5;
+      box-shadow:
+        0 26px 70px rgba(17, 24, 39, 0.15),
+        0 4px 16px rgba(17, 24, 39, 0.08);
+    }
+
+    #tabbar {
+      position: relative;
+      height: 38px;
+      flex: none;
+      display: flex;
+      align-items: flex-end;
+      padding: 0 14px;
+      gap: 3px;
+      background: #17181d;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+    .is-light #tabbar {
+      background: #e7e9ed;
+      border-bottom-color: rgba(17, 19, 24, 0.09);
+    }
+
+    .lights {
+      display: flex;
+      gap: 7px;
+      align-self: center;
+      margin-right: 10px;
+      flex: none;
+    }
+    .lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+    .lights i:nth-child(1) { background: #ff5f57; }
+    .lights i:nth-child(2) { background: #febc2e; }
+    .lights i:nth-child(3) { background: #28c840; }
+
+    #chaos-tabs {
+      display: flex;
+      flex: 1;
+      min-width: 0;
+      gap: 3px;
+      align-items: flex-end;
+      height: 29px;
+    }
+
+    .yt-tab {
+      flex: 1;
+      min-width: 0;
+      height: 29px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 7px;
+      border-radius: 7px 7px 0 0;
+      background: #24262e;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: none;
+      color: rgba(240, 242, 246, 0.78);
+      font-size: 11px;
+      overflow: hidden;
+      transform-origin: center bottom;
+    }
+    .yt-tab.active { background: #30333e; color: #ffffff; }
+    .yt-dot {
+      flex: none;
+      width: 13px;
+      height: 9.5px;
+      border-radius: 2.5px;
+      background: #ff0000;
+      position: relative;
+    }
+    .yt-dot::after {
+      content: "";
+      position: absolute;
+      left: 4.8px;
+      top: 2px;
+      border-left: 4.5px solid #fff;
+      border-top: 2.5px solid transparent;
+      border-bottom: 2.5px solid transparent;
+    }
+    .yt-tab span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+    #foldtube-tab {
+      position: absolute;
+      left: 72px;
+      bottom: 0;
+      height: 29px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 14px 0 10px;
+      border-radius: 7px 7px 0 0;
+      background: #0f0f0f;
+      color: #f1f3f7;
+      font-size: 12px;
+      font-weight: 500;
+      opacity: 0;
+    }
+    .is-light #foldtube-tab {
+      background: #ffffff;
+      color: #1c1f24;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+    #foldtube-tab img { width: 14px; height: 14px; }
+
+    #toolbar {
+      height: 38px;
+      flex: none;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+      background: #22242b;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .is-light #toolbar {
+      background: #f3f4f6;
+      border-bottom-color: rgba(17, 19, 24, 0.08);
+    }
+
+    .nav-btns { display: flex; gap: 9px; color: rgba(255, 255, 255, 0.4); font-size: 13px; }
+    .is-light .nav-btns { color: rgba(17, 19, 24, 0.35); }
+
+    #omnibar {
+      flex: 1;
+      height: 25px;
+      border-radius: 999px;
+      background: #14161b;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.66);
+      min-width: 0;
+    }
+    .is-light #omnibar {
+      background: #ffffff;
+      border-color: rgba(17, 19, 24, 0.1);
+      color: rgba(17, 19, 24, 0.65);
+    }
+    #omnibar-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+    #ext-btn {
+      position: relative;
+      height: 27px;
+      padding: 0 10px 0 7px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 86, 71, 0.5);
+      background: rgba(255, 36, 36, 0.16);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      flex: none;
+      transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .ext-icon-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #ext-btn:hover {
+      background: rgba(255, 36, 36, 0.3);
+      box-shadow: 0 0 18px rgba(255, 36, 36, 0.45);
+    }
+    #ext-btn.folded {
+      border-color: transparent;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .is-light #ext-btn.folded {
+      background: rgba(17, 19, 24, 0.06);
+    }
+    #ext-btn img { width: 17px; height: 17px; }
+    #ext-badge {
+      position: absolute;
+      right: -4px;
+      bottom: -4px;
+      min-width: 16px;
+      height: 14px;
+      padding: 0 3px;
+      border-radius: 4px;
+      background: #e52521;
+      color: #ffffff;
+      font-size: 9.5px;
+      font-weight: 800;
+      line-height: 14px;
+      text-align: center;
+    }
+    #ext-click-hint { transition: opacity 0.25s; }
+    #ext-btn.folded #ext-click-hint { display: none; }
+
+    /* Shortcut toast pill inside browser */
+    #shortcut-pill {
+      position: absolute;
+      top: 86px;
+      right: 22px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #e62626 0%, #b81414 100%);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 28px rgba(230, 38, 38, 0.45);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 25;
+    }
+    #shortcut-pill kbd {
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font-family: inherit;
+      font-size: 11.5px;
+    }
+
+    /* Viewport layers */
+    #viewport {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      overflow: hidden;
+      background: #0f0f0f;
+    }
+
+    .scene-img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: auto;
+      display: block;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    /* Local YouTube watch-page mock (Scene 1 before fold) */
+    #yt-watch-mock {
+      position: absolute;
+      inset: 0;
+      background: #0f0f0f;
+      display: grid;
+      grid-template-columns: 1fr minmax(220px, 30%);
+      gap: 20px;
+      padding: 20px 24px;
+      opacity: 1;
+    }
+    .yt-player {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+    }
+    .yt-player img { width: 100%; height: 100%; object-fit: cover; }
+    .yt-scrubber {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+      height: 4px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.28);
+    }
+    .yt-scrubber i { display: block; width: 56%; height: 100%; background: #ff0000; border-radius: 3px; }
+    .yt-watch-title { font-size: clamp(14px, 1.5vw, 18px); font-weight: 700; margin-top: 12px; color: #f1f1f1; }
+    .yt-watch-chan { font-size: 13px; color: #aaaaaa; margin-top: 4px; }
+    .yt-sidebar { display: flex; flex-direction: column; gap: 11px; overflow: hidden; }
+    .yt-side-item { display: grid; grid-template-columns: 124px 1fr; gap: 10px; align-items: start; }
+    .yt-side-item img { width: 124px; height: 70px; border-radius: 7px; object-fit: cover; }
+    .yt-side-title { font-size: 12px; font-weight: 600; line-height: 1.28; color: #f1f1f1; margin-bottom: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .yt-side-chan { font-size: 11px; color: #9e9e9e; }
+
+    /* Floating pills inside the stage */
+    #callout-badge {
+      position: absolute;
+      bottom: 24px;
+      right: 28px;
+      z-index: 30;
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: rgba(15, 17, 23, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #privacy-pills {
+      position: absolute;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      width: 94%;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .p-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 15px;
+      border-radius: 999px;
+      background: rgba(15, 17, 23, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #f5f7fa;
+      font-size: 13.5px;
+      font-weight: 600;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+      white-space: nowrap;
+    }
+    .p-pill::before {
+      content: "✓";
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      background: rgba(46, 204, 113, 0.22);
+      color: #4ade80;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    /* Progress bar along top of sticky stage */
+    .story-progress {
+      position: absolute;
+      top: 68px;
+      left: 0;
+      right: 0;
+      height: 2.5px;
+      background: rgba(255, 255, 255, 0.06);
+      z-index: 40;
+    }
+    #story-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #ff5647, #e62626);
+    }
+
+    /* ═══════════════════════════════════════════
+       Feature Bento Strip + Shortcuts
+       ═══════════════════════════════════════════ */
+    .features-section {
+      position: relative;
+      padding: 104px 24px 72px;
+      background: linear-gradient(180deg, #0b0c10 0%, #101218 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .section-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .section-kicker {
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #ff6961;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .section-heading {
+      font-size: clamp(1.85rem, 3.6vw, 2.85rem);
+      font-weight: 820;
+      letter-spacing: -0.03em;
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .bento-card {
+      padding: 26px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      transition: border-color 0.25s, transform 0.25s;
+    }
+    .bento-card:hover {
+      border-color: rgba(255, 92, 82, 0.35);
+      transform: translateY(-2px);
+    }
+
+    .bento-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: rgba(255, 56, 46, 0.14);
+      border: 1px solid rgba(255, 86, 71, 0.28);
+      color: #ff7a70;
+      display: grid;
+      place-items: center;
+      margin-bottom: 16px;
+    }
+
+    .bento-card h3 {
+      font-size: 18px;
+      font-weight: 720;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .bento-card p {
+      font-size: 14.5px;
+      line-height: 1.55;
+      color: var(--muted-dark);
+    }
+
+    .shortcuts-strip {
+      margin-top: 28px;
+      padding: 20px 26px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .shortcut-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--muted-dark);
+    }
+
+    .shortcut-item kbd {
+      padding: 4px 10px;
+      border-radius: 7px;
+      background: #1b1d25;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-bottom-width: 2.5px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    /* ═══════════════════════════════════════════
+       FAQ Accordion Section
+       ═══════════════════════════════════════════ */
+    .faq-section {
+      padding: 84px 24px 88px;
+      background: #101218;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .faq-inner {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    .faq-list {
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+      overflow: hidden;
+    }
+
+    .faq-item + .faq-item {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .faq-item summary {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 24px;
+      font-size: 16.5px;
+      font-weight: 650;
+      letter-spacing: -0.015em;
+      color: #f6f7f9;
+      cursor: pointer;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .faq-item summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .faq-item summary:hover {
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .faq-item summary::after {
+      content: "";
+      flex: none;
+      width: 8px;
+      height: 8px;
+      margin-right: 4px;
+      border-right: 2px solid rgba(241, 243, 247, 0.55);
+      border-bottom: 2px solid rgba(241, 243, 247, 0.55);
+      transform: rotate(45deg) translateY(-2px);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .faq-item[open] summary::after {
+      transform: rotate(-135deg) translateY(-2px);
+      border-color: #ff6961;
+    }
+
+    .faq-answer {
+      padding: 0 24px 22px;
+      font-size: 15px;
+      line-height: 1.65;
+      color: var(--muted-dark);
+    }
+
+    .faq-answer strong {
+      color: #f6f7f9;
+      font-weight: 600;
+    }
+
+    .faq-answer a {
+      color: #ff857d;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .faq-answer a:hover {
+      color: #ffffff;
+    }
+
+    /* ═══════════════════════════════════════════
+       Final CTA & Footer
+       ═══════════════════════════════════════════ */
+    .final-cta {
+      position: relative;
+      padding: 108px 24px 96px;
+      text-align: center;
+      background:
+        radial-gradient(860px 440px at 50% 60%, rgba(230, 34, 34, 0.25), transparent 68%),
+        linear-gradient(180deg, #101218 0%, #090a0d 100%);
+      overflow: hidden;
+    }
+
+    .final-icon {
+      width: 92px;
+      height: 92px;
+      margin: 0 auto 24px;
+      border-radius: 24px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(155deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55), 0 0 56px rgba(255, 36, 36, 0.24);
+    }
+    .final-icon img { width: 66px; height: 66px; }
+
+    .final-cta h2 {
+      font-size: clamp(2rem, 4.6vw, 3.4rem);
+      font-weight: 850;
+      letter-spacing: -0.035em;
+      margin-bottom: 14px;
+    }
+
+    .final-cta p {
+      font-size: 18px;
+      color: var(--muted-dark);
+      max-width: 560px;
+      margin: 0 auto 32px;
+      line-height: 1.5;
+    }
+
+    footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: #08090c;
+      padding: 28px 24px;
+      font-size: 13.5px;
+      color: rgba(241, 243, 247, 0.55);
+    }
+
+    .footer-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .footer-links a:hover { color: #ffffff; }
+
+    /* ═══════════════════════════════════════════
+       Mobile & Reduced-Motion Responsive Fallback
+       ═══════════════════════════════════════════ */
+    .mobile-story { display: none; }
+
+    @media (max-width: 860px) {
+      .nav-link { display: none; }
+      .bento { grid-template-columns: 1fr; }
+      #story-track { display: none; }
+      .mobile-story {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        padding: 24px 18px 64px;
+        max-width: 680px;
+        margin: 0 auto;
+      }
+      .mobile-card {
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #14161e;
+      }
+      .mobile-card.light {
+        background: #f4f5f8;
+        color: var(--text-light);
+        border-color: rgba(17, 19, 24, 0.12);
+      }
+      .mobile-card-head { padding: 22px 20px 16px; }
+      .mobile-card-head .k { font-size: 11px; font-weight: 750; letter-spacing: 0.14em; text-transform: uppercase; color: #ff6961; margin-bottom: 6px; }
+      .mobile-card.light .mobile-card-head .k { color: #d92626; }
+      .mobile-card-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.025em; margin-bottom: 6px; }
+      .mobile-card-head p { font-size: 14.5px; line-height: 1.45; color: var(--muted-dark); }
+      .mobile-card.light .mobile-card-head p { color: var(--muted-light); }
+      .mobile-card img { width: 100%; display: block; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+      .mobile-card.light img { border-top-color: rgba(17, 19, 24, 0.08); }
+    }
+
+    @media (max-width: 520px) {
+      .nav-actions .btn-sm span.label-long { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .scroll-cue .chev { animation: none; }
+    }
+  </style>
 </head>
-<body><p><a href="https://github.com/ymj/FoldTube">FoldTube on GitHub</a> · <a href="privacy.html">Privacy Policy</a></p></body>
+<body>
+  <!-- Sticky Navigation -->
+  <nav class="top-nav" aria-label="Primary">
+    <a class="nav-brand" href="#top">
+      <img src="icon128.png" alt="">
+      <span>FoldTube</span>
+    </a>
+    <div class="nav-actions">
+      <a class="nav-link" href="#features">Features</a>
+      <a class="nav-link" href="#faq">FAQ</a>
+      <a class="nav-link" href="privacy.html">Privacy</a>
+      <a class="nav-link" href="https://github.com/ymj/FoldTube" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a class="btn btn-sm btn-secondary store-chrome" href="https://chromewebstore.google.com/detail/foldtube-youtube-tab-mana/phkhokoagdgofaaofmecfaibcnnahhoh" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" y1="8" x2="12" y2="8"/><line x1="3.95" y1="6.06" x2="8.54" y2="14"/><line x1="10.88" y1="21.94" x2="15.46" y2="14"/></svg>
+        <span>Chrome</span>
+      </a>
+      <a class="btn btn-sm btn-secondary store-firefox" href="https://addons.mozilla.org/en-US/firefox/addon/foldtube-youtube-tab-manager/" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 0 0-4 12.7A5 5 0 1 0 16 8c-1.5 0-2.5.8-3 2"/></svg>
+        <span>Firefox</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero Intro -->
+  <header id="top" class="hero">
+    <div class="hero-inner">
+      <div class="hero-eyebrow">
+        <span class="hero-eyebrow-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          Free
+        </span>
+        <span class="hero-eyebrow-sep" aria-hidden="true"></span>
+        <span class="hero-eyebrow-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Private
+        </span>
+        <span class="hero-eyebrow-sep" aria-hidden="true"></span>
+        <a class="hero-eyebrow-item" href="https://github.com/ymj/FoldTube" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Open-source
+        </a>
+      </div>
+      <h1>Fold your YouTube tabs into <em>one clean dashboard.</em></h1>
+      <p class="hero-sub">Stop losing videos in a sea of open tabs. One click saves and closes every YouTube tab, speeds up your browser, and keeps your watch list searchable and ready to resume.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-lg btn-primary store-chrome" href="https://chromewebstore.google.com/detail/foldtube-youtube-tab-mana/phkhokoagdgofaaofmecfaibcnnahhoh" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" y1="8" x2="12" y2="8"/><line x1="3.95" y1="6.06" x2="8.54" y2="14"/><line x1="10.88" y1="21.94" x2="15.46" y2="14"/></svg>
+          Add to Chrome / Brave / Edge
+        </a>
+        <a class="btn btn-lg btn-secondary store-firefox" href="https://addons.mozilla.org/en-US/firefox/addon/foldtube-youtube-tab-manager/" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 0 0-4 12.7A5 5 0 1 0 16 8c-1.5 0-2.5.8-3 2"/></svg>
+          Add to Firefox
+        </a>
+      </div>
+      <div class="hero-meta">
+        <span>No account required</span>
+        <span>·</span>
+        <span>Zero tracking or analytics</span>
+        <span>·</span>
+        <span>Works on Videos, Shorts &amp; Live</span>
+      </div>
+      <a class="scroll-cue" href="#story-track">
+        <span>Scroll to see it fold</span>
+        <span class="chev" aria-hidden="true">↓</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Desktop Scroll-Driven Interactive Showcase -->
+  <section id="story-track" aria-label="Interactive product walkthrough">
+    <div id="story-sticky">
+      <div class="story-progress" aria-hidden="true"><div id="story-progress-fill"></div></div>
+      <div id="stage-bg-dark" class="stage-bg"></div>
+      <div id="stage-bg-light" class="stage-bg"></div>
+      <div id="stage-grid-dark" class="stage-grid"></div>
+      <div id="stage-grid-light" class="stage-grid"></div>
+
+      <div class="chapter-nav" role="tablist" aria-label="Walkthrough scenes">
+        <button class="chapter-btn active" data-chapter="0" type="button">1 · Fold tabs</button>
+        <button class="chapter-btn" data-chapter="1" type="button">2 · Watch &amp; resume</button>
+        <button class="chapter-btn" data-chapter="2" type="button">3 · Find fast</button>
+        <button class="chapter-btn" data-chapter="3" type="button">4 · Clean up fast</button>
+        <button class="chapter-btn" data-chapter="4" type="button">5 · Browse your way</button>
+        <button class="chapter-btn" data-chapter="5" type="button">6 · Stays private</button>
+      </div>
+
+      <div class="stage-header">
+        <div id="stage-eyebrow">ONE-CLICK TAB FOLDING</div>
+        <h2 id="stage-title">Too many YouTube tabs?</h2>
+        <p id="stage-sub">Scroll down or click the FoldTube button to save and close every open YouTube tab at once.</p>
+      </div>
+
+      <div id="window-wrap">
+        <div id="browser-shell" class="browser-shell">
+          <div id="tabbar">
+            <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div id="chaos-tabs" aria-hidden="true"></div>
+            <div id="foldtube-tab">
+              <img src="icon128.png" alt="">
+              <span>FoldTube — Dashboard</span>
+            </div>
+          </div>
+
+          <div id="toolbar">
+            <div class="nav-btns" aria-hidden="true"><span>←</span><span>→</span><span>↻</span></div>
+            <div id="omnibar">
+              <span id="omnibar-text">youtube.com/watch?v=QqsLTNkzvaY</span>
+              <span id="omnibar-pill" style="font-size:11px;color:#ff847c;font-weight:700;">17 open YouTube tabs</span>
+            </div>
+            <button id="ext-btn" type="button" title="Click to fold tabs">
+              <span class="ext-icon-wrap">
+                <img src="icon128.png" alt="">
+                <span id="ext-badge">17</span>
+              </span>
+              <span id="ext-click-hint">Click to fold</span>
+            </button>
+          </div>
+
+          <div id="shortcut-pill" aria-hidden="true">
+            <span>Fold all YouTube tabs</span>
+            <kbd>⇧⌘Y</kbd>
+          </div>
+
+          <div id="viewport">
+            <div id="yt-watch-mock">
+              <div>
+                <div class="yt-player">
+                  <img src="img/watch-0.jpg" alt="YouTube video playing before folding">
+                  <div class="yt-scrubber"><i></i></div>
+                </div>
+                <div class="yt-watch-title">What If You Fall into a Black Hole?</div>
+                <div class="yt-watch-chan">Kurzgesagt – In a Nutshell</div>
+              </div>
+              <div class="yt-sidebar">
+                <div class="yt-side-item">
+                  <img src="img/watch-1.jpg" alt="">
+                  <div><div class="yt-side-title">Transformers, the tech behind LLMs | Deep Learning Chapter 5</div><div class="yt-side-chan">3Blue1Brown</div></div>
+                </div>
+                <div class="yt-side-item">
+                  <img src="img/watch-2.jpg" alt="">
+                  <div><div class="yt-side-title">The Simplest Math Problem No One Can Solve</div><div class="yt-side-chan">Veritasium</div></div>
+                </div>
+                <div class="yt-side-item">
+                  <img src="img/watch-3.jpg" alt="">
+                  <div><div class="yt-side-title">Backyard Squirrel Maze 1.0 - Ninja Warrior Course</div><div class="yt-side-chan">Mark Rober</div></div>
+                </div>
+                <div class="yt-side-item">
+                  <img src="img/watch-4.jpg" alt="">
+                  <div><div class="yt-side-title">How The Immune System ACTUALLY Works</div><div class="yt-side-chan">Kurzgesagt – In a Nutshell</div></div>
+                </div>
+                <div class="yt-side-item">
+                  <img src="img/watch-5.jpg" alt="">
+                  <div><div class="yt-side-title">But what is a neural network? | Deep learning chapter 1</div><div class="yt-side-chan">3Blue1Brown</div></div>
+                </div>
+              </div>
+            </div>
+
+            <img id="img-top" class="scene-img" src="img/scene-top.jpg" alt="FoldTube dark dashboard showing saved videos">
+            <img id="img-shorts" class="scene-img" src="img/scene-shorts.jpg" alt="FoldTube dashboard showing Videos and Shorts with playback resume bars">
+            <img id="img-filter" class="scene-img" src="img/scene-filter.jpg" alt="FoldTube search combined with Videos and 15-30 min active filter pills">
+            <img id="img-bulk" class="scene-img" src="img/scene-bulk.jpg" alt="FoldTube bulk selection with sticky action bar">
+            <img id="img-light" class="scene-img" src="img/scene-light.jpg" alt="FoldTube light theme with channel grouping and compact list view">
+            <img id="img-privacy" class="scene-img" src="img/scene-privacy.jpg" alt="FoldTube Settings showing local JSON and HTML Backup and Restore">
+
+            <div id="callout-badge">Instant Undo · 90-day History · Zero tracking</div>
+            <div id="privacy-pills">
+              <span class="p-pill">No account or sign-in</span>
+              <span class="p-pill">Zero tracking or ads</span>
+              <span class="p-pill">Saved only on your device</span>
+              <span class="p-pill">Open-source on GitHub</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mobile Stacked Walkthrough -->
+  <section class="mobile-story" aria-label="Product highlights">
+    <article class="mobile-card">
+      <div class="mobile-card-head">
+        <div class="k">Watch &amp; Resume</div>
+        <h2>Every YouTube tab, one clean list.</h2>
+        <p>Fold all your open YouTube tabs in one click and pick up right where you left off.</p>
+      </div>
+      <img src="img/scene-shorts.jpg" alt="FoldTube dashboard showing Videos and Shorts" loading="lazy">
+    </article>
+    <article class="mobile-card">
+      <div class="mobile-card-head">
+        <div class="k">Find Fast</div>
+        <h2>Find the right video in seconds.</h2>
+        <p>Search titles or channels and filter by Videos, Shorts, or how much time you have.</p>
+      </div>
+      <img src="img/scene-filter.jpg" alt="FoldTube search and filter pills" loading="lazy">
+    </article>
+    <article class="mobile-card">
+      <div class="mobile-card-head">
+        <div class="k">Clean Up Fast</div>
+        <h2>Open or clear videos in bulk.</h2>
+        <p>Select multiple videos at once — backed by instant Undo and 90-day History.</p>
+      </div>
+      <img src="img/scene-bulk.jpg" alt="FoldTube bulk selection action bar" loading="lazy">
+    </article>
+    <article class="mobile-card light">
+      <div class="mobile-card-head">
+        <div class="k">Browse Your Way</div>
+        <h2>Group by channel. Grid or list.</h2>
+        <p>Switch between grid or a compact list, in Light or Dark mode — or let your system choose.</p>
+      </div>
+      <img src="img/scene-light.jpg" alt="FoldTube light theme with channel grouping and list view" loading="lazy">
+    </article>
+    <article class="mobile-card">
+      <div class="mobile-card-head">
+        <div class="k">Stays Private</div>
+        <h2>100% on your device. No account. No tracking.</h2>
+        <p>Your watch list never leaves your browser, with one-click JSON and HTML backups anytime.</p>
+      </div>
+      <img src="img/scene-privacy.jpg" alt="FoldTube local JSON and HTML backup settings" loading="lazy">
+    </article>
+  </section>
+
+  <!-- Feature Bento & Shortcuts -->
+  <section id="features" class="features-section">
+    <div class="section-inner">
+      <div class="section-kicker">MADE FOR EVERYDAY YOUTUBE WATCHERS</div>
+      <h2 class="section-heading">Fast, calm, and completely yours.</h2>
+
+      <div class="bento">
+        <div class="bento-card">
+          <div class="bento-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          </div>
+          <h3>Organized by channel</h3>
+          <p>Group your list by Videos and Shorts or by creator, collapse channels you've already browsed, and jump straight to any channel.</p>
+        </div>
+        <div class="bento-card">
+          <div class="bento-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h3>Pick up where you left off</h3>
+          <p>Folding remembers where you paused. Click any saved video later to jump straight back to that exact moment.</p>
+        </div>
+        <div class="bento-card">
+          <div class="bento-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3>Private on your device</h3>
+          <p>No account, no servers, and no tracking. Your list stays in your browser, with one-click JSON and HTML backups whenever you want.</p>
+        </div>
+        <div class="bento-card">
+          <div class="bento-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </div>
+          <h3>Find something to watch fast</h3>
+          <p>Have 5 minutes or an hour? Search across titles and channels, or filter by Videos, Shorts, and how long you want to watch.</p>
+        </div>
+        <div class="bento-card">
+          <div class="bento-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+          </div>
+          <h3>Undo mistakes anytime</h3>
+          <p>Opened or removed a video by accident? Hit Undo right away, or bring it back from History up to 90 days later.</p>
+        </div>
+        <div class="bento-card">
+          <div class="bento-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </div>
+          <h3>Browse your way</h3>
+          <p>Switch between grid or a compact list, in Light or Dark mode — or let your system choose.</p>
+        </div>
+      </div>
+
+      <div class="shortcuts-strip" aria-label="Default keyboard shortcuts">
+        <div class="shortcut-item"><kbd data-kbd-fold>Ctrl+Shift+Y</kbd><span>Fold all YouTube tabs</span></div>
+        <div class="shortcut-item"><kbd data-kbd-one>Ctrl+Shift+E</kbd><span>Fold current tab</span></div>
+        <div class="shortcut-item"><kbd data-kbd-dash>Ctrl+Shift+U</kbd><span>Open dashboard</span></div>
+        <div class="shortcut-item"><span>Right-click any video link to save without opening</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Accordion -->
+  <section id="faq" class="faq-section" aria-labelledby="faq-heading">
+    <div class="faq-inner">
+      <div class="section-kicker">QUESTIONS &amp; ANSWERS</div>
+      <h2 id="faq-heading" class="section-heading">Good to know before you install.</h2>
+
+      <div class="faq-list">
+        <details class="faq-item" name="faq" open>
+          <summary>Is my watch list private? Do you track what I watch?</summary>
+          <div class="faq-answer">
+            Everything is stored locally on your machine and nothing ever leaves it. FoldTube has no accounts, no servers, no ads, and no analytics — we never track how you use it or what you watch. Read the full <a href="privacy.html">Privacy Policy</a>.
+          </div>
+        </details>
+
+        <details class="faq-item" name="faq">
+          <summary>Which tabs get closed when I fold?</summary>
+          <div class="faq-answer">
+            Only open YouTube videos, Shorts, and live streams are saved and closed. Your YouTube homepage, search results, playlists, and every other tab in your browser stay untouched.
+          </div>
+        </details>
+
+        <details class="faq-item" name="faq">
+          <summary>Why do videos disappear from my list after I open them?</summary>
+          <div class="faq-answer">
+            FoldTube works like a <strong>to-do list</strong> for your YouTube tabs. When you click a video to watch it, it opens right where you left off and clears itself from your list so your dashboard stays tidy. Changed your mind? Hit <strong>Undo</strong> right away, fold the tab back in anytime, or restore it from <strong>History</strong> up to 90 days later.
+          </div>
+        </details>
+
+        <details class="faq-item" name="faq">
+          <summary>Can I back up or move my saved list to another computer?</summary>
+          <div class="faq-answer">
+            Yes. Because everything stays on your machine, you can export a copy as JSON or an HTML bookmarks page anytime in Settings, and import your JSON backup on any computer.
+          </div>
+        </details>
+
+        <details class="faq-item" name="faq">
+          <summary>Which browsers does FoldTube work on?</summary>
+          <div class="faq-answer">
+            FoldTube works on Chrome, Brave, Edge, and other Chromium-based browsers via the <a href="https://chromewebstore.google.com/detail/foldtube-youtube-tab-mana/phkhokoagdgofaaofmecfaibcnnahhoh" target="_blank" rel="noopener noreferrer">Chrome Web Store</a>, and on Firefox 142+ via <a href="https://addons.mozilla.org/en-US/firefox/addon/foldtube-youtube-tab-manager/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a>.
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="final-cta">
+    <div class="final-icon">
+      <img src="icon128.png" alt="FoldTube">
+    </div>
+    <h2>Reclaim your browser tabs.</h2>
+    <p>Install FoldTube in seconds. Free forever, open-source on GitHub, and completely on your device.</p>
+    <div class="hero-ctas">
+      <a class="btn btn-lg btn-primary store-chrome" href="https://chromewebstore.google.com/detail/foldtube-youtube-tab-mana/phkhokoagdgofaaofmecfaibcnnahhoh" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" y1="8" x2="12" y2="8"/><line x1="3.95" y1="6.06" x2="8.54" y2="14"/><line x1="10.88" y1="21.94" x2="15.46" y2="14"/></svg>
+        Add to Chrome / Brave / Edge
+      </a>
+      <a class="btn btn-lg btn-secondary store-firefox" href="https://addons.mozilla.org/en-US/firefox/addon/foldtube-youtube-tab-manager/" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 0 0-4 12.7A5 5 0 1 0 16 8c-1.5 0-2.5.8-3 2"/></svg>
+        Add to Firefox
+      </a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-inner">
+      <span><strong>FoldTube</strong> · Made OSum by Yazan Malakha</span>
+      <div class="footer-links">
+        <a href="https://chromewebstore.google.com/detail/foldtube-youtube-tab-mana/phkhokoagdgofaaofmecfaibcnnahhoh" target="_blank" rel="noopener noreferrer">Chrome Web Store</a>
+        <a href="https://addons.mozilla.org/en-US/firefox/addon/foldtube-youtube-tab-manager/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a>
+        <a href="https://github.com/ymj/FoldTube" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="privacy.html">Privacy Policy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function initFoldTubeSite() {
+      // Detect OS & browser for helpful shortcut labels and subtle primary CTA highlight.
+      const ua = navigator.userAgent || '';
+      const isMac = /Mac|iPhone|iPad/i.test(navigator.platform || ua);
+      const isFirefox = /Firefox/i.test(ua);
+
+      if (isMac) {
+        document.querySelector('[data-kbd-fold]').textContent = '⇧⌘Y';
+        document.querySelector('[data-kbd-one]').textContent = '⇧⌘E';
+        document.querySelector('[data-kbd-dash]').textContent = '⇧⌘U';
+      } else {
+        document.querySelector('#shortcut-pill kbd').textContent = 'Ctrl+Shift+Y';
+      }
+
+      if (isFirefox) {
+        document.querySelectorAll('.store-firefox').forEach((b) => b.classList.add('is-detected'));
+        document.querySelectorAll('.hero .store-chrome, .final-cta .store-chrome').forEach((b) => {
+          b.classList.remove('btn-primary');
+          b.classList.add('btn-secondary');
+        });
+      } else {
+        document.querySelectorAll('.top-nav .store-chrome').forEach((b) => b.classList.add('is-detected'));
+      }
+
+      // Build the 11 visible YouTube tabs representing 17 open tabs.
+      const TAB_TITLES = [
+        'What If You Fall into a Black Hole?',
+        'Transformers, the tech behind LLMs',
+        'The Simplest Math Problem No One Can Solve',
+        'Backyard Squirrel Maze 1.0',
+        'How The Immune System ACTUALLY Works',
+        'But what is a neural network?',
+        'Why Laminar Flow is AWESOME',
+        'Docker in 100 Seconds',
+        'Attention in transformers, step-by-step',
+        'The Biggest Misconception About Electricity',
+        'Backyard Squirrel Maze 2.0',
+      ];
+
+      const chaosTabsEl = document.getElementById('chaos-tabs');
+      const tabNodes = TAB_TITLES.map((title, idx) => {
+        const tab = document.createElement('div');
+        tab.className = idx === 0 ? 'yt-tab active' : 'yt-tab';
+        const dot = document.createElement('span');
+        dot.className = 'yt-dot';
+        const label = document.createElement('span');
+        label.textContent = title;
+        tab.append(dot, label);
+        chaosTabsEl.appendChild(tab);
+        return tab;
+      });
+
+      const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const invLerp = (a, b, v) => clamp((v - a) / (b - a));
+      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+      const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+      const track = document.getElementById('story-track');
+      const chapterBtns = [...document.querySelectorAll('.chapter-btn')];
+      const el = {
+        progress: document.getElementById('story-progress-fill'),
+        bgLight: document.getElementById('stage-bg-light'),
+        gridDark: document.getElementById('stage-grid-dark'),
+        gridLight: document.getElementById('stage-grid-light'),
+        eyebrow: document.getElementById('stage-eyebrow'),
+        title: document.getElementById('stage-title'),
+        sub: document.getElementById('stage-sub'),
+        shell: document.getElementById('browser-shell'),
+        foldTab: document.getElementById('foldtube-tab'),
+        omnibarText: document.getElementById('omnibar-text'),
+        omnibarPill: document.getElementById('omnibar-pill'),
+        extBtn: document.getElementById('ext-btn'),
+        extBadge: document.getElementById('ext-badge'),
+        shortcutPill: document.getElementById('shortcut-pill'),
+        ytMock: document.getElementById('yt-watch-mock'),
+        imgTop: document.getElementById('img-top'),
+        imgShorts: document.getElementById('img-shorts'),
+        imgFilter: document.getElementById('img-filter'),
+        imgBulk: document.getElementById('img-bulk'),
+        imgLight: document.getElementById('img-light'),
+        imgPrivacy: document.getElementById('img-privacy'),
+        callout: document.getElementById('callout-badge'),
+        privacyPills: document.getElementById('privacy-pills'),
+        privacyPillItems: [...document.querySelectorAll('#privacy-pills .p-pill')],
+      };
+
+      // Timeline runs cleanly across normalized scroll progress p in [0, 1]
+      const CHAPTERS = [
+        {
+          start: 0.0, end: 0.18, jump: 0.02,
+          eyebrow: 'ONE-CLICK TAB FOLDING',
+          title: 'Too many YouTube tabs?',
+          sub: 'Scroll down or click the FoldTube button to save and close every open YouTube tab at once.',
+        },
+        {
+          start: 0.18, end: 0.36, jump: 0.27,
+          eyebrow: 'WATCH & RESUME',
+          title: 'Every video & Short in one clean list.',
+          sub: 'Pick up right where you left off without hunting through open tabs.',
+        },
+        {
+          start: 0.36, end: 0.52, jump: 0.44,
+          eyebrow: 'FIND FAST',
+          title: 'Find the right video in seconds.',
+          sub: 'Search titles or channels and filter by Videos, Shorts, or how much time you have.',
+        },
+        {
+          start: 0.52, end: 0.68, jump: 0.60,
+          eyebrow: 'CLEAN UP FAST',
+          title: 'Open or clear multiple videos at once.',
+          sub: 'Select as many videos as you want — with instant Undo and 90-day History.',
+        },
+        {
+          start: 0.68, end: 0.84, jump: 0.76,
+          eyebrow: 'BROWSE YOUR WAY',
+          title: 'Group by channel. Grid, list, light or dark.',
+          sub: 'View your list as visual cards or compact rows, in the theme that fits your screen.',
+        },
+        {
+          start: 0.84, end: 1.01, jump: 0.94,
+          eyebrow: 'STAYS PRIVATE',
+          title: '100% on your device. No account. No tracking.',
+          sub: 'Your watch list stays in your browser — with one-click JSON and HTML backups anytime.',
+        },
+      ];
+
+      function jumpToProgress(p) {
+        const rect = track.getBoundingClientRect();
+        const trackTop = window.scrollY + rect.top;
+        const maxScroll = Math.max(1, track.offsetHeight - window.innerHeight);
+        window.scrollTo({ top: trackTop + p * maxScroll, behavior: 'smooth' });
+      }
+
+      chapterBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = Number(btn.dataset.chapter);
+          jumpToProgress(CHAPTERS[idx].jump);
+        });
+      });
+
+      // Interactive "Click to fold" button inside the demo browser!
+      el.extBtn.addEventListener('click', () => {
+        jumpToProgress(0.22);
+      });
+
+      function renderProgress(p) {
+        el.progress.style.width = `${(p * 100).toFixed(2)}%`;
+
+        const idx = Math.max(0, CHAPTERS.findIndex((c) => p >= c.start && p < c.end));
+        const ch = CHAPTERS[idx];
+        el.eyebrow.textContent = ch.eyebrow;
+        el.title.textContent = ch.title;
+        el.sub.textContent = ch.sub;
+        chapterBtns.forEach((b, i) => b.classList.toggle('active', i === idx));
+
+        // Light mode crossfade for Chapter 5 (0.67 -> 0.85)
+        const lightMix = p < 0.66
+          ? 0
+          : p < 0.70
+            ? easeInOutCubic(invLerp(0.66, 0.70, p))
+            : p < 0.82
+              ? 1
+              : 1 - easeInOutCubic(invLerp(0.82, 0.86, p));
+
+        el.bgLight.style.opacity = lightMix.toFixed(3);
+        el.gridLight.style.opacity = lightMix.toFixed(3);
+        el.gridDark.style.opacity = (1 - lightMix).toFixed(3);
+        const isLight = lightMix > 0.5;
+        el.shell.classList.toggle('is-light', isLight);
+        document.body.classList.toggle('page-light', isLight);
+        el.title.style.color = isLight ? '#111318' : '#f6f7f9';
+        el.sub.style.color = isLight ? 'rgba(17, 19, 24, 0.66)' : 'rgba(241, 243, 247, 0.72)';
+        el.eyebrow.style.color = isLight ? '#d92626' : '#ff6961';
+
+        // Chapter 1: 17 tabs fold cleanly between p=0.10 and p=0.17
+        const foldP = easeInOutCubic(invLerp(0.09, 0.17, p));
+        tabNodes.forEach((tab, i) => {
+          const shiftX = -i * 65 * foldP;
+          const scaleX = lerp(1, 0.18, foldP);
+          tab.style.opacity = (1 - foldP).toFixed(3);
+          tab.style.transform = `translateX(${shiftX.toFixed(1)}px) scaleX(${scaleX.toFixed(3)})`;
+        });
+
+        el.foldTab.style.opacity = easeOutCubic(invLerp(0.13, 0.18, p)).toFixed(3);
+        el.omnibarText.textContent = foldP > 0.5 ? 'foldtube://dashboard' : 'youtube.com/watch?v=QqsLTNkzvaY';
+        el.omnibarPill.style.opacity = (1 - easeOutCubic(invLerp(0.09, 0.14, p))).toFixed(3);
+        el.extBtn.classList.toggle('folded', foldP > 0.45);
+
+        const pillIn = easeOutCubic(invLerp(0.07, 0.11, p));
+        const pillOut = 1 - easeOutCubic(invLerp(0.16, 0.20, p));
+        el.shortcutPill.style.opacity = (pillIn * pillOut).toFixed(3);
+        el.shortcutPill.style.transform = `translateY(${lerp(10, 0, pillIn).toFixed(1)}px)`;
+
+        // Watch mock dissolves into Top Videos dashboard
+        const mockAlpha = 1 - easeInOutCubic(invLerp(0.11, 0.17, p));
+        el.ytMock.style.opacity = mockAlpha.toFixed(3);
+        el.ytMock.style.transform = `scale(${lerp(1, 0.96, 1 - mockAlpha).toFixed(4)})`;
+
+        // Chapter 2: Top Videos -> Videos + Shorts
+        const topIn = easeOutCubic(invLerp(0.12, 0.18, p));
+        const topOut = 1 - easeInOutCubic(invLerp(0.24, 0.28, p));
+        el.imgTop.style.opacity = (topIn * topOut).toFixed(3);
+
+        const shortsIn = easeInOutCubic(invLerp(0.24, 0.28, p));
+        const shortsOut = 1 - easeInOutCubic(invLerp(0.35, 0.39, p));
+        el.imgShorts.style.opacity = (shortsIn * shortsOut).toFixed(3);
+
+        // Chapter 3: Search & Filters
+        const filtIn = easeInOutCubic(invLerp(0.35, 0.39, p));
+        const filtOut = 1 - easeInOutCubic(invLerp(0.51, 0.55, p));
+        el.imgFilter.style.opacity = (filtIn * filtOut).toFixed(3);
+
+        // Chapter 4: Bulk Actions
+        const bulkIn = easeInOutCubic(invLerp(0.51, 0.55, p));
+        const bulkOut = 1 - easeInOutCubic(invLerp(0.66, 0.70, p));
+        el.imgBulk.style.opacity = (bulkIn * bulkOut).toFixed(3);
+
+        const callIn = easeOutCubic(invLerp(0.54, 0.58, p));
+        const callOut = 1 - easeOutCubic(invLerp(0.65, 0.68, p));
+        el.callout.style.opacity = (callIn * callOut).toFixed(3);
+        el.callout.style.transform = `translateY(${lerp(14, 0, callIn).toFixed(1)}px)`;
+
+        // Chapter 5: Light Mode + Channels + List View
+        const lightIn = easeInOutCubic(invLerp(0.66, 0.70, p));
+        const lightOut = 1 - easeInOutCubic(invLerp(0.82, 0.86, p));
+        el.imgLight.style.opacity = (lightIn * lightOut).toFixed(3);
+
+        // Chapter 6: Privacy & Local Backup
+        const privIn = easeInOutCubic(invLerp(0.82, 0.86, p));
+        el.imgPrivacy.style.opacity = privIn.toFixed(3);
+
+        const ppIn = easeOutCubic(invLerp(0.85, 0.90, p));
+        el.privacyPills.style.opacity = ppIn.toFixed(3);
+        el.privacyPillItems.forEach((pill, i) => {
+          const st = easeOutCubic(invLerp(0.85 + i * 0.015, 0.89 + i * 0.015, p));
+          pill.style.opacity = st.toFixed(3);
+          pill.style.transform = `translateY(${lerp(16, 0, st).toFixed(1)}px)`;
+        });
+      }
+
+      let rafId = 0;
+      function onScroll() {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+          rafId = 0;
+          const rect = track.getBoundingClientRect();
+          const maxScroll = Math.max(1, track.offsetHeight - window.innerHeight);
+          const p = clamp(-rect.top / maxScroll, 0, 1);
+          renderProgress(p);
+        });
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+      onScroll();
+    })();
+  </script>
+</body>
 </html>
