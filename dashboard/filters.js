@@ -58,7 +58,11 @@ export function libraryView(videos, { query = '', duration = null, sort = 'date-
   return compare ? list.sort(compare) : list;
 }
 
-/** The Group by menu's choices: no grouping, or by channel in an order. */
+/**
+ * The Group by menu's choices: by media type ('none': Videos and Shorts in
+ * their own sections, the default; the value predates the name), or by
+ * channel in an order.
+ */
 export const GROUP_BY = ['none', 'channel-az', 'channel-za', 'channel-recent', 'channel-count'];
 
 /** The group a video belongs to: its channel name, or '' when unknown. */

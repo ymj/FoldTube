@@ -14,17 +14,23 @@ FoldTube is a powerful YouTube tab manager that helps you take back control of y
 - **Single-tab collapse** via `Ctrl+Shift+E` (Windows/Linux) / `Cmd+Shift+E` (Mac)
 - **Right-click menu**: fold the YouTube video page you're on, or save a link to a YouTube video without opening it
 - **Quick dashboard** without folding tabs via `Ctrl+Shift+U` (Windows/Linux) / `Cmd+Shift+U` (Mac)
-- **Organized dashboard** with separate sections for Videos and Shorts
+- **Toolbar count**: show your open YouTube tabs or saved library size on the toolbar icon—choose in Settings, or turn it off
+- **Group by media or by channel**:
+  - **Group by media type** (the default): Videos and Shorts appear in separate sections.
+  - **Group by channel**: order channels A→Z, Z→A, recently saved, or most videos (names starting with a number or symbol come after letters; unknown channel last). Each channel's Shorts sit in a row right after its videos. Sticky channel headers stay visible while scrolling—click a header to collapse or expand it, or use **Collapse all / Expand all**. Your grouping choice and collapsed channels are remembered.
+  - **Whole-channel actions** (shown on header hover): **Open all** (for channels with 2+ videos; asks first when opening more than 5) and **Clear group** (click twice to confirm, with Undo).
+  - **Channel jump bar**: while grouped by channel, slim ticks along the right edge show where you are. Hover, click, or press `G` to open **Jump to channel** with video counts, and type to filter once you have more than 10 channels (hidden on narrow windows, touch screens, or when everything fits on one screen).
+- **Sticky search, sort & duration filters**: the search and filter bar stays visible while scrolling; sort by date saved, length, or title with a button to flip the order, and filter by duration
+- **Keyboard navigation**: `Tab` to any video card and press `Enter` or `Space` to open it
 - **Pick up where you left off**: folding a video remembers how far you got, and opening it resumes from there
-- **Light, Dark, and System theme** — follows your OS preference by default, or override it in Settings
-- **Real-time search**, multiple sorting options, and duration filter pills
-- **Bulk actions** — select, open, or remove multiple tabs at once
-- **Auto-collapse on browser exit** with smart duplicate detection on restore
-- **Metadata enrichment** via the YouTube Data API v3 (channel names, durations for sleeping tabs)
-- **Import / Export** your library as JSON or a shareable HTML bookmark page
+- **Bulk actions**: select, open, or remove multiple videos at once
 - **Instant Undo** for accidental deletions
 - **History**: videos you open or remove stay there for 90 days, so you can put them back or delete them for good
-
+- **Light, Dark, and System theme**: follows your OS preference by default, or override it in Settings
+- **Auto-collapse on browser exit** with smart duplicate detection on restore
+- **Metadata enrichment** via an optional YouTube Data API v3 key (channel names and durations for sleeping tabs)
+- **Import / Export** your library as JSON or a shareable HTML bookmark page
+- **Built-in Help & shortcuts**: how-it-works guide, FAQ, and your current keyboard shortcuts right in Settings
 
 ---
 
