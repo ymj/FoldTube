@@ -139,6 +139,13 @@ export function selectableIn(videos, groupBy, collapsed) {
   return videos.filter(v => !collapsed.has(groupId(channelKey(v))));
 }
 
+/** Keep only selected ids that are still shown (not filtered out or in a collapsed group). */
+export function visibleSelection(selected, videos, groupBy, collapsed) {
+  if (selected.size === 0) return new Set();
+  const shown = new Set(selectableIn(videos, groupBy, collapsed).map(v => v.videoId));
+  return new Set([...selected].filter(id => shown.has(id)));
+}
+
 /**
  * The collapsed groups worth keeping: current-format ids of channels still in
  * the library. Older ids and channels since emptied are dropped.

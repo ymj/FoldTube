@@ -7,7 +7,7 @@
 import { thumbnailUrlFor, isYouTubeUrl, resumeSeconds, formatDuration, YOUTUBE_TAB_PATTERNS, countFoldableTabs } from '../lib/youtube.js';
 import { isBackInLibrary, daysLeft } from '../lib/archive.js';
 import { matchesSearch, historyItems, groupByDay, expiryLabel, HISTORY_FILTERS } from '../lib/history.js';
-import { libraryView, splitByType, groupByChannel, groupId, videosInGroup, selectableIn } from './filters.js';
+import { libraryView, splitByType, groupByChannel, groupId, videosInGroup, selectableIn, visibleSelection } from './filters.js';
 import { renderRail } from './rail.js';
 import { state } from './state.js';
 
@@ -89,6 +89,13 @@ export function renderLibrary() {
   try {
     const videos = visibleVideos();
     const total = state.videos.length;
+    // Drop selections hidden by a filter, search, or collapsed group so
+    // Open Selected and Delete Selected only act on what's shown.
+    const kept = visibleSelection(state.selected, videos, state.library.groupBy, state.library.collapsed);
+    if (kept.size !== state.selected.size) {
+      state.selected.clear();
+      for (const id of kept) state.selected.add(id);
+    }
     updateSelectionBar();
 
     const videoGrid = document.getElementById('video-grid');
@@ -249,8 +256,18 @@ function groupAction(action, text, ariaLabel, paths) {
 export function setGroupCollapsed(group, collapsed, { updateButton = true } = {}) {
   group.classList.toggle('collapsed', collapsed);
   group.querySelector('.group-toggle').setAttribute('aria-expanded', String(!collapsed));
-  if (collapsed) state.library.collapsed.add(group.dataset.group);
-  else state.library.collapsed.delete(group.dataset.group);
+  if (collapsed) {
+    state.library.collapsed.add(group.dataset.group);
+    let changed = false;
+    for (const card of group.querySelectorAll('.video-card.selected')) {
+      card.classList.remove('selected');
+      card.querySelector('.card-checkbox').checked = false;
+      changed = state.selected.delete(card.dataset.id) || changed;
+    }
+    if (changed) updateSelectionBar();
+  } else {
+    state.library.collapsed.delete(group.dataset.group);
+  }
   if (updateButton) updateCollapseAll();
 }
 

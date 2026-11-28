@@ -90,9 +90,13 @@ function bindMenu(name, onPick) {
     }
   });
 
-  // A click elsewhere only closes the menu, as a native dropdown does: it
-  // doesn't also open the video under it. A click on the other menu's
-  // button still opens that menu.
+  closeOnOutsidePress(picker, menu, close);
+}
+
+// A click elsewhere only closes the menu, as a native dropdown does: it
+// doesn't also open the video under it. A click on another menu's button
+// still opens that menu.
+function closeOnOutsidePress(picker, menu, close) {
   let swallowClick = false;
   document.addEventListener('pointerdown', (e) => {
     swallowClick = false;
@@ -639,22 +643,7 @@ function bindFilterMenu() {
     }
   });
 
-  // Same outside-click handling as Sort and Group menus: closes without
-  // clicking a card underneath.
-  let swallowClick = false;
-  document.addEventListener('pointerdown', (e) => {
-    swallowClick = false;
-    if (menu.classList.contains('hidden') || picker.contains(e.target)) return;
-    close({ focusButton: false });
-    swallowClick = !e.target.closest('.menu-picker');
-  });
-  document.addEventListener('click', (e) => {
-    if (!swallowClick) return;
-    swallowClick = false;
-    e.stopPropagation();
-    e.preventDefault();
-  }, true);
-  document.addEventListener('keydown', () => { swallowClick = false; }, true);
+  closeOnOutsidePress(picker, menu, close);
 
   const renderActiveChips = () => {
     const chips = [];
@@ -716,6 +705,15 @@ function bindFilterMenu() {
     }
   };
 
+  // Screen readers hear the new count after a filter change, not on every
+  // redraw (search typing, a tab saved in the background).
+  const status = document.getElementById('filter-status');
+  const applyFilters = () => {
+    renderActiveChips();
+    renderLibrary();
+    status.textContent = document.querySelector('.video-count').textContent;
+  };
+
   const setMedia = (media) => {
     if (!MEDIA_FILTERS.includes(media) || view.media === media) return;
     view.media = media;
@@ -727,8 +725,7 @@ function bindFilterMenu() {
       activeDurationLabel = '';
     }
     syncDurationState();
-    renderActiveChips();
-    renderLibrary();
+    applyFilters();
   };
 
   const setDuration = (target) => {
@@ -744,8 +741,7 @@ function bindFilterMenu() {
     for (const item of durationItems) {
       item.setAttribute('aria-checked', String(item === chosen));
     }
-    renderActiveChips();
-    renderLibrary();
+    applyFilters();
   };
 
   const clearAllFilters = () => {
@@ -756,8 +752,7 @@ function bindFilterMenu() {
     for (const item of mediaItems) item.setAttribute('aria-checked', String(item.dataset.media === 'all'));
     for (const item of durationItems) item.setAttribute('aria-checked', String(item === allDurationItem));
     syncDurationState();
-    renderActiveChips();
-    renderLibrary();
+    applyFilters();
   };
 
   menu.addEventListener('click', (e) => {

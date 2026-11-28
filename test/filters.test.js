@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, matchesMedia, splitByType, groupByChannel, parseSort, railTick, railChannelAt, railWaveWeights, railPeekRange, isAimingAtPopover, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, MEDIA_FILTERS, SORT_FIELDS, SORTS, RAIL_MAX_TICKS, RAIL_PEEK_OVER, LAYOUTS } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, matchesMedia, splitByType, groupByChannel, parseSort, railTick, railChannelAt, railWaveWeights, railPeekRange, isAimingAtPopover, channelInitial, groupId, videosInGroup, selectableIn, visibleSelection, liveCollapsed, GROUP_BY, MEDIA_FILTERS, SORT_FIELDS, SORTS, RAIL_MAX_TICKS, RAIL_PEEK_OVER, LAYOUTS } from '../dashboard/filters.js';
 import { state } from '../dashboard/state.js';
 import { dashboardFiles } from './helpers.js';
 
@@ -126,8 +126,24 @@ describe('library view', () => {
 
   test('media filter starts at All and is not remembered between visits', async () => {
     assert.equal(state.library.media, 'all');
-    const storeSrc = await readFile(new URL('../dashboard/store.js', import.meta.url), 'utf8');
-    assert.doesNotMatch(storeSrc, /\bmedia\b/);
+    const before = { ...state.library };
+    let written;
+    globalThis.chrome = { storage: { local: {
+      get: async () => ({ libraryView: { groupBy: 'none', layout: 'grid', collapsed: [], media: 'short' } }),
+      set: async (value) => { written = value; },
+    } } };
+    try {
+      const { loadLibraryView, saveLibraryView } = await import('../dashboard/store.js');
+      state.library.media = 'video';
+      await saveLibraryView();
+      assert.ok(!('media' in written.libraryView), 'media is not saved');
+      state.library.media = 'all';
+      await loadLibraryView();
+      assert.equal(state.library.media, 'all', 'a stored media value is ignored');
+    } finally {
+      delete globalThis.chrome;
+      Object.assign(state.library, before);
+    }
   });
 
   test('the filter menu offers media type and length choices, both at All by default', async () => {
@@ -261,6 +277,23 @@ describe('group by channel', () => {
     const collapsed = new Set([groupId('Amy')]);
     assert.deepEqual(ids(selectableIn(mixed, 'channel-az', collapsed)), ['b1']);
     assert.deepEqual(ids(selectableIn(mixed, 'none', collapsed)), ['a1', 'as', 'b1']);
+  });
+
+  test('visibleSelection drops items hidden by a filter or collapsed group', () => {
+    const mixed = [
+      v('a1', { channelName: 'Amy', videoType: 'video' }),
+      v('as', { channelName: 'Amy', videoType: 'short' }),
+      v('b1', { channelName: 'Bob', videoType: 'video' }),
+      v('bs', { channelName: 'Bob', videoType: 'short' }),
+    ];
+    const allSelected = new Set(['a1', 'as', 'b1', 'bs']);
+    // Switching from All to Shorts drops the hidden Videos so Delete/Open only act on Shorts.
+    const shortsOnly = libraryView(mixed, { media: 'short' });
+    assert.deepEqual([...visibleSelection(allSelected, shortsOnly, 'none', new Set())], ['as', 'bs']);
+    // Collapsing a channel group drops selections inside it.
+    assert.deepEqual([...visibleSelection(allSelected, mixed, 'channel-az', new Set([groupId('Amy')]))], ['b1', 'bs']);
+    // When nothing matches, selection empties.
+    assert.deepEqual([...visibleSelection(allSelected, [], 'none', new Set())], []);
   });
 
   test('collapsed groups kept: current ids of channels still in the library', () => {
