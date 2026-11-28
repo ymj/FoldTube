@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, railChannelAt, railWaveWeights, railPeekRange, isAimingAtPopover, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS, RAIL_PEEK_OVER } from '../dashboard/filters.js';
+import { libraryView, matchesDuration, splitByType, groupByChannel, parseSort, railTick, railChannelAt, railWaveWeights, railPeekRange, isAimingAtPopover, channelInitial, groupId, videosInGroup, selectableIn, liveCollapsed, GROUP_BY, SORT_FIELDS, SORTS, RAIL_MAX_TICKS, RAIL_PEEK_OVER, LAYOUTS } from '../dashboard/filters.js';
 import { dashboardFiles } from './helpers.js';
 
 const v = (videoId, extra = {}) => ({
@@ -274,6 +274,18 @@ describe('channel rail', () => {
     for (const id of ['channel-rail', 'rail-ticks', 'rail-popover', 'rail-heading', 'rail-filter', 'rail-list', 'rail-expand', 'btn-collapse-all']) {
       assert.match(html, new RegExp(`id="${id}"`), id);
     }
+  });
+});
+
+describe('layout', () => {
+  test('grid comes first: the default, and the fallback for a saved value it no longer knows', () => {
+    assert.deepEqual(LAYOUTS, ['grid', 'list']);
+  });
+
+  test('the page has a Grid / List switch with one button per layout', async () => {
+    const html = await readFile(new URL('../dashboard/dashboard.html', import.meta.url), 'utf8');
+    assert.match(html, /id="layout-toggle"[^>]*role="group"/);
+    for (const layout of LAYOUTS) assert.match(html, new RegExp(`data-layout="${layout}"[^>]*aria-pressed=`), layout);
   });
 });
 

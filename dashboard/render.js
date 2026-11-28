@@ -55,7 +55,9 @@ export function showLoadFailed() {
 export function updateSelectionBar() {
   const bar = document.getElementById('selection-bar');
   const count = document.getElementById('selection-count');
-  bar.classList.toggle('hidden', state.selected.size === 0);
+  const hasSelection = state.selected.size > 0;
+  bar.classList.toggle('hidden', !hasSelection);
+  document.body.classList.toggle('has-selection', hasSelection);
   count.textContent = `${state.selected.size} selected`;
 }
 
@@ -202,8 +204,12 @@ function channelGroups(groups) {
 
     header.append(toggle, actions);
 
+    // Wraps the group's items: transparent to Grid's subgrid (display: contents),
+    // and a single rounded surface container in List view.
+    const items = document.createElement('div');
+    items.className = 'group-items';
     const { standard, shorts } = splitByType(list);
-    group.append(header, ...standard.map(video => createCard(video, index++)));
+    items.append(...standard.map(video => createCard(video, index++)));
     if (shorts.length) {
       const row = document.createElement('div');
       row.className = 'group-shorts shorts-grid';
@@ -211,8 +217,9 @@ function channelGroups(groups) {
       label.className = 'group-shorts-label';
       label.textContent = `Shorts · ${shorts.length}`;
       row.append(label, ...shorts.map(video => createCard(video, index++)));
-      group.appendChild(row);
+      items.appendChild(row);
     }
+    group.append(header, items);
     return group;
   });
 }
@@ -268,8 +275,9 @@ export function setCardSelected(card, selected) {
 
 function createCard(video, index) {
   const selected = state.selected.has(video.videoId);
+  const isShort = video.videoType === 'short';
   const card = document.createElement('div');
-  card.className = 'video-card';
+  card.className = isShort ? 'video-card is-short' : 'video-card';
   if (selected) card.classList.add('selected');
   card.dataset.id = video.videoId;
   // Reachable with Tab; Enter or Space acts as a click (see controls.js).
@@ -281,17 +289,16 @@ function createCard(video, index) {
 
   const date = new Date(video.dateSaved).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 
-  // Checkbox
+  // Thumbnail container (holds checkbox, image, duration badge and resume bar)
+  const thumbContainer = document.createElement('div');
+  thumbContainer.className = 'thumbnail-container';
+
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   checkbox.className = 'card-checkbox';
   checkbox.value = video.videoId;
   checkbox.checked = selected;
-  card.appendChild(checkbox);
-
-  // Thumbnail container
-  const thumbContainer = document.createElement('div');
-  thumbContainer.className = 'thumbnail-container';
+  thumbContainer.appendChild(checkbox);
 
   const img = document.createElement('img');
   img.className = 'thumbnail';
@@ -326,11 +333,28 @@ function createCard(video, index) {
   const cardContent = document.createElement('div');
   cardContent.className = 'card-content';
 
+  const cardBody = document.createElement('div');
+  cardBody.className = 'card-body';
+
+  const titleRow = document.createElement('div');
+  titleRow.className = 'title-row';
+
   const title = document.createElement('h3');
   title.className = 'title';
   title.title = video.title || '';
   title.textContent = video.title || '';
-  cardContent.appendChild(title);
+  titleRow.appendChild(title);
+
+  if (isShort) {
+    const shortBadge = document.createElement('span');
+    shortBadge.className = 'short-badge';
+    shortBadge.textContent = 'Short';
+    titleRow.appendChild(shortBadge);
+  }
+  cardBody.appendChild(titleRow);
+
+  const meta = document.createElement('div');
+  meta.className = 'card-meta';
 
   // A link only with a channel page to go to. Without one (saved from a
   // link, or a closed window), plain text: a "#" link opened a second
@@ -344,18 +368,20 @@ function createCard(video, index) {
     channel.rel = 'noopener noreferrer';
   }
   channel.textContent = video.channelName || '';
-  cardContent.appendChild(channel);
+  meta.appendChild(channel);
 
   const dateSaved = document.createElement('div');
   dateSaved.className = 'date-saved';
-  dateSaved.textContent = `Saved: ${date}`;
+  dateSaved.append(`Saved: ${date}`);
   if (resumeAt > 0) {
     const resume = document.createElement('span');
     resume.className = 'resume-label';
     resume.textContent = `Resume at ${formatDuration(resumeAt)}`;
     dateSaved.append(' · ', resume);
   }
-  cardContent.appendChild(dateSaved);
+  meta.appendChild(dateSaved);
+  cardBody.appendChild(meta);
+  cardContent.appendChild(cardBody);
 
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'delete-btn';

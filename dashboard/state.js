@@ -19,6 +19,7 @@ export const state = {
     // Remembered between visits:
     groupBy: 'none', // 'none' (by media type: Videos and Shorts sections), or by channel in an order: see GROUP_BY
     collapsed: new Set(), // collapsed groups, as "<section>:<channel>"
+    layout: 'grid', // 'grid' (cards) or 'list' (one row per video): see LAYOUTS
   },
 
   history: {

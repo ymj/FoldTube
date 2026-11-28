@@ -18,6 +18,10 @@
   --rail-tick: #c2c2c2;
   --rail-popover-bg: rgb(255 255 255 / 0.96);
   --rail-popover-border: var(--border-color);
+  --list-divider: rgb(0 0 0 / 0.075);
+  --list-row-hover: rgb(0 0 0 / 0.035);
+  --short-badge-bg: rgb(220 38 38 / 0.1);
+  --short-badge-fg: #cc0000;
 
   /* Non-theme tokens */
   --border-radius: 8px;
@@ -40,6 +44,10 @@
     --rail-tick: #484848;
     --rail-popover-bg: rgb(24 24 24 / 0.96);
     --rail-popover-border: #353535;
+    --list-divider: rgb(255 255 255 / 0.075);
+    --list-row-hover: rgb(255 255 255 / 0.055);
+    --short-badge-bg: rgb(255 0 0 / 0.14);
+    --short-badge-fg: #ff6b6b;
   }
 }
 
@@ -57,6 +65,10 @@
   --rail-tick: #484848;
   --rail-popover-bg: rgb(24 24 24 / 0.96);
   --rail-popover-border: #353535;
+  --list-divider: rgb(255 255 255 / 0.075);
+  --list-row-hover: rgb(255 255 255 / 0.055);
+  --short-badge-bg: rgb(255 0 0 / 0.14);
+  --short-badge-fg: #ff6b6b;
 }
 
 /* ════════════════════════════════════════
@@ -456,11 +468,11 @@ a.channel:hover {
   color: var(--text-secondary);
 }
 
-.video-group.collapsed > .group-shorts {
-  display: none;
+.group-items {
+  display: contents;
 }
 
-.video-group.collapsed > .video-card {
+.video-group.collapsed .group-items {
   display: none;
 }
 
@@ -2318,5 +2330,375 @@ body.has-rail .controls-bar {
   body.has-rail .main-content,
   body.has-rail .controls-bar {
     padding-right: 24px;
+  }
+}
+
+/* ════════════════════════════════════════
+   Layout: Grid or List
+   ════════════════════════════════════════ */
+
+.layout-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: var(--surface-color);
+  overflow: hidden;
+}
+
+.layout-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* As tall as the Sort and Group buttons beside it. */
+  padding: 9.5px 11px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  line-height: 0;
+  cursor: pointer;
+  transition: color var(--transition-speed), background-color var(--transition-speed);
+}
+
+.layout-toggle button + button {
+  border-left: 1px solid var(--border-color);
+}
+
+.layout-toggle button:hover {
+  color: var(--text-primary);
+}
+
+.layout-toggle button[aria-pressed="true"] {
+  background-color: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.layout-toggle button:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -2px;
+}
+
+/* Helpers used by List; transparent in Grid so card layout stays unchanged. */
+.card-body,
+.title-row,
+.card-meta {
+  display: contents;
+}
+
+.short-badge {
+  display: none;
+}
+
+/* List: each section (or each channel's items beneath its header) sits in a
+   single rounded surface with hairline dividers, keeping the same thumbnail
+   overlays, metadata order and channel headers as Grid view. */
+body.list-layout .video-grid,
+body.list-layout .shorts-grid {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+body.list-layout .video-grid:not(.by-channel),
+body.list-layout #shorts-grid {
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+body.list-layout .video-grid.by-channel {
+  row-gap: 24px;
+}
+
+/* Keeps the Grid header's -8px top/bottom margin math intact (14px - 8px = 6px
+   clean gap above the surface) without overlapping the first row. */
+body.list-layout .video-group {
+  row-gap: 14px;
+}
+
+body.list-layout .group-items {
+  display: block;
+  grid-column: 1 / -1;
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+body.list-layout .video-group.collapsed .group-items {
+  display: none;
+}
+
+body.list-layout .group-shorts {
+  display: block;
+  margin-top: 0;
+  gap: 0;
+}
+
+/* Mixed channels get a slim divider band before their Shorts; Shorts-only
+   channels drop the redundant sub-header and tag rows inline instead. */
+body.list-layout .group-shorts-label {
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background-color: color-mix(in srgb, var(--bg-color) 45%, var(--surface-color));
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--list-divider);
+}
+
+body.list-layout .group-items:not(:has(> .video-card)) .group-shorts-label {
+  display: none;
+}
+
+body.list-layout .video-card {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+  padding: 10px 14px;
+  border-radius: 0;
+  background-color: transparent;
+}
+
+body.list-layout .video-card + .video-card {
+  border-top: 1px solid var(--list-divider);
+}
+
+body.list-layout .video-card:hover {
+  transform: none;
+  box-shadow: none;
+  background-color: var(--list-row-hover);
+}
+
+/* Selected: a subtle tint and left accent bar (matching the channel rail).
+   Keyboard focus: an inset ring so it is never clipped by the container. */
+body.list-layout .video-card.selected {
+  outline: none;
+  box-shadow: inset 3px 0 0 var(--selection-color);
+  background-color: color-mix(in srgb, var(--selection-color) 11%, transparent);
+}
+
+body.list-layout .video-card.selected:hover {
+  box-shadow: inset 3px 0 0 var(--selection-color);
+  background-color: color-mix(in srgb, var(--selection-color) 16%, transparent);
+}
+
+body.list-layout .video-card:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -2px;
+}
+
+body.list-layout .card-exit {
+  animation: listRowExit 0.25s ease forwards;
+}
+
+@keyframes listRowExit {
+  to {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+body.list-layout .card-content {
+  display: contents;
+}
+
+body.list-layout .card-body {
+  display: block;
+  min-width: 0;
+}
+
+body.list-layout .thumbnail-container,
+body.list-layout .shorts-grid .thumbnail-container {
+  width: 112px;
+  height: 63px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: #0a0a0a;
+}
+
+/* Shorts keep their 9:16 frame centered inside the slot (like History). */
+body.list-layout .video-card.is-short .thumbnail {
+  width: 36px;
+  height: 100%;
+  margin: 0 auto;
+}
+
+body.list-layout .card-checkbox {
+  top: 6px;
+  left: 6px;
+  width: 18px;
+  height: 18px;
+}
+
+body.list-layout.has-selection .card-checkbox {
+  opacity: 1;
+}
+
+body.list-layout .duration-badge {
+  bottom: 5px;
+  right: 5px;
+  padding: 1px 5px;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+body.list-layout .resume-track {
+  height: 3px;
+}
+
+body.list-layout .title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.list-layout .title {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding-right: 0;
+  font-size: 0.94rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+body.list-layout .by-channel .video-card.is-short .short-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: var(--short-badge-bg);
+  color: var(--short-badge-fg);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+body.list-layout .card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+body.list-layout .channel {
+  display: block;
+  margin: 0;
+  font-size: inherit;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.list-layout .date-saved {
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+body.list-layout .video-grid:not(.by-channel) .channel:not(:empty) + .date-saved::before {
+  content: "·";
+  margin: 0 7px;
+  opacity: 0.6;
+}
+
+body.list-layout .delete-btn {
+  position: static;
+  width: 30px;
+  height: 30px;
+  opacity: 0;
+  transition: opacity var(--transition-speed), color var(--transition-speed), background-color var(--transition-speed);
+}
+
+body.list-layout .video-card:hover .delete-btn,
+body.list-layout .video-card:focus-within .delete-btn,
+body.list-layout .video-card:focus-visible .delete-btn {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  body.list-layout .delete-btn {
+    opacity: 1;
+  }
+}
+
+/* Loading skeletons match the horizontal row layout in List view. */
+body.list-layout .skeleton-card {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 16px;
+  row-gap: 8px;
+  align-content: center;
+  padding: 10px 14px;
+  border-radius: 0;
+  background-color: transparent;
+}
+
+body.list-layout .skeleton-card + .skeleton-card {
+  border-top: 1px solid var(--list-divider);
+}
+
+body.list-layout .skeleton-thumb {
+  grid-row: 1 / 3;
+  width: 112px;
+  height: 63px;
+  border-radius: 6px;
+}
+
+body.list-layout .skeleton-line {
+  margin: 0;
+  align-self: end;
+  max-width: 420px;
+}
+
+body.list-layout .skeleton-line.short {
+  align-self: start;
+  width: 40%;
+  max-width: 220px;
+}
+
+@media (max-width: 600px) {
+  body.list-layout .video-card {
+    grid-template-columns: 92px minmax(0, 1fr) auto;
+    column-gap: 12px;
+    padding: 9px 10px;
+  }
+
+  body.list-layout .thumbnail-container,
+  body.list-layout .shorts-grid .thumbnail-container {
+    width: 92px;
+    height: 52px;
+  }
+
+  body.list-layout .video-card.is-short .thumbnail {
+    width: 30px;
+  }
+
+  body.list-layout .title {
+    display: -webkit-box;
+    white-space: normal;
+  }
+
+  body.list-layout .skeleton-card {
+    grid-template-columns: 92px minmax(0, 1fr);
+    column-gap: 12px;
+    padding: 9px 10px;
+  }
+
+  body.list-layout .skeleton-thumb {
+    width: 92px;
+    height: 52px;
   }
 }

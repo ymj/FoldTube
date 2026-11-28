@@ -120,6 +120,16 @@ function bindViewMenus() {
     saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
   });
 
+  // Grid or List: the same cards, laid out as cards or as rows, so nothing
+  // needs redrawing.
+  document.getElementById('layout-toggle').addEventListener('click', (e) => {
+    const layout = e.target.closest('button[data-layout]')?.dataset.layout;
+    if (!layout || layout === view.layout) return;
+    view.layout = layout;
+    showLibraryView();
+    saveLibraryView().catch(err => console.error('FoldTube: could not save the view', err));
+  });
+
   // A new field starts in its natural direction (newest, shortest, A to Z);
   // the arrow beside it reverses that.
   bindMenu('sort', (field) => {
@@ -212,9 +222,14 @@ export function showSettings() {
   document.getElementById('badge-select').value = settings.badge;
 }
 
-/** Show the Group by and Sort choices on their buttons and in their menus. */
+/** Show the Group by, Sort and layout choices on their buttons and in their menus. */
 export function showLibraryView() {
   showPicked('group', state.library.groupBy);
+  const { layout } = state.library;
+  document.body.classList.toggle('list-layout', layout === 'list');
+  for (const button of document.querySelectorAll('#layout-toggle button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
+  }
   const { field, direction } = parseSort(state.library.sort);
   showPicked('sort', field);
   const flip = document.getElementById('sort-direction');
