@@ -265,8 +265,9 @@ async function scrapeTab(tab) {
       metadata.durationSeconds = 0;
       metadata.durationFormatted = '';
     }
-    delete metadata.durationSource;
   } catch (_) { /* the player read is best-effort */ }
+  // Only for the check above: never stored.
+  delete metadata.durationSource;
   const { seconds, source } = positionFromPlayer(metadata, player);
   metadata.timestampSeconds = seconds;
   metadata.positionSource = source;
@@ -297,7 +298,9 @@ function processAndSaveTabs(tabs) {
   return enqueueFold(async () => {
     // These tabs were listed before this fold waited its turn: a fold just
     // before may have closed some. Fold the ones still open, as they are now.
-    const current = (await Promise.all(tabs.map(t => chrome.tabs.get(t.id).catch(() => null)))).filter(Boolean);
+    // Only tabs showing a video count: a playlist page isn't "left open".
+    const current = (await Promise.all(tabs.map(t => chrome.tabs.get(t.id).catch(() => null))))
+      .filter(t => t && parseVideoUrl(t.url));
     if (current.length === 0) return { closed: 0, leftOpen: 0, saved: 0, saveFailed: false };
     const result = await foldTabs(current, { readTab: scrapeTab, save: saveFoldedVideos, closeTab: closeFoldedTab });
     // Fill in channel (and, with an API key, duration) for URL-only entries.
@@ -315,8 +318,9 @@ function handleCollapse() {
 }
 
 async function collapseAndOpenDashboard() {
-  const tabs = await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS });
-  
+  // watch?* also matches pages without a video (a playlist): not tabs to fold.
+  const tabs = (await chrome.tabs.query({ url: YOUTUBE_TAB_PATTERNS })).filter(t => parseVideoUrl(t.url));
+
   if (tabs.length > 0) {
     const { closed, leftOpen } = await processAndSaveTabs(tabs);
     notify("foldtube-collapse", `Folded ${closed} YouTube tab${closed === 1 ? '' : 's'}`
