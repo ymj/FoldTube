@@ -17,7 +17,7 @@ export const state = {
     sort: 'date-desc',
     duration: null, // { min, max } in seconds, or null for any length
     // Remembered between visits:
-    groupBy: 'none', // 'none', or by channel in an order: see GROUP_BY in filters.js
+    groupBy: 'none', // 'none' (by media type: Videos and Shorts sections), or by channel in an order: see GROUP_BY
     collapsed: new Set(), // collapsed groups, as "<section>:<channel>"
   },
 

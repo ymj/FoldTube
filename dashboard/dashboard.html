@@ -94,7 +94,7 @@
              so the button is always as wide as the longest: picking a
              choice doesn't shift the controls around it. -->
         <span class="picker-labels" id="group-button-labels">
-          <span data-value="none">Group: None</span>
+          <span data-value="none">Media: Type</span>
           <span data-value="channel-az">Channel: A → Z</span>
           <span data-value="channel-za">Channel: Z → A</span>
           <span data-value="channel-recent">Channel: Recent</span>
@@ -102,7 +102,8 @@
         </span>
       </button>
       <div class="picker-menu hidden" id="group-menu" role="menu" aria-label="Group by">
-        <button type="button" role="menuitemradio" data-value="none">No grouping</button>
+        <div class="picker-menu-heading" aria-hidden="true">Group by media</div>
+        <button type="button" role="menuitemradio" data-value="none" aria-label="Group by media type: Videos and Shorts">Type</button>
         <div class="picker-menu-divider" role="separator"></div>
         <div class="picker-menu-heading" aria-hidden="true">Group by channel</div>
         <button type="button" role="menuitemradio" data-value="channel-az" aria-label="Group by channel, A to Z">A → Z</button>
