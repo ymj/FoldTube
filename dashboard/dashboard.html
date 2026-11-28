@@ -200,11 +200,11 @@
   <!-- Grouped by channel: where you are, and a list to jump to a channel. -->
   <nav id="channel-rail" class="channel-rail hidden" aria-label="Channels">
     <button id="rail-ticks" class="rail-ticks" aria-haspopup="true" aria-expanded="false"
-      aria-controls="rail-popover"></button>
+      aria-controls="rail-popover" aria-keyshortcuts="G"></button>
     <div id="rail-popover" class="rail-popover">
       <div class="rail-chrome">
         <div class="rail-chrome-inner">
-          <div id="rail-heading" class="rail-heading"></div>
+          <div class="rail-heading"><span id="rail-heading">Jump to channel</span><kbd class="rail-key" aria-hidden="true" title="Press G to open this list">G</kbd></div>
           <input id="rail-filter" class="rail-filter" type="search" placeholder="Filter channels…"
             aria-label="Filter channels" autocomplete="off" hidden>
         </div>

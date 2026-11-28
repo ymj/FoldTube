@@ -2159,6 +2159,10 @@ body.has-rail .controls-bar {
 }
 
 .rail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 4px 10px 8px;
   margin-bottom: 6px;
   border-bottom: 1px solid var(--rail-popover-border);
@@ -2167,6 +2171,17 @@ body.has-rail .controls-bar {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--text-secondary);
+}
+
+.rail-key {
+  min-width: 18px;
+  padding: 1px 5px;
+  border: 1px solid var(--rail-popover-border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.65rem;
+  letter-spacing: 0;
+  text-align: center;
 }
 
 .rail-filter {

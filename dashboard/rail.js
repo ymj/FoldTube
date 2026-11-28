@@ -47,6 +47,7 @@ let expandFrame = 0;
 let lastClientY = null;
 let peekSteps = 0;
 let pointerTrail = [];
+let jumping = false; // a jump's smooth scroll is under way
 
 const groupElements = () => document.querySelectorAll('#video-grid > .video-group');
 
@@ -439,7 +440,10 @@ function jumpTo(index, { byKeyboard = false, keepOpen = false } = {}) {
   }
   if (!byKeyboard && focusInside) document.activeElement.blur();
   setActive(index);
-  // Don't let the smooth scroll light up every channel it passes.
+  // Don't let the smooth scroll light up every channel it passes. The pause
+  // lasts while the scroll does (see the scroll listener), or 1s if the page
+  // doesn't move at all.
+  jumping = true;
   followPausedUntil = performance.now() + 1000;
   const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
   const top = group.getBoundingClientRect().top + scrollY - HEADER_OVERHANG - stickyTop();
@@ -513,6 +517,8 @@ export function bindRail() {
     clearHandoff();
     hoverTarget = -1;
     lastClientY = null;
+    // The ladder no longer points anywhere: show where you are again.
+    setPreview(-1);
     // Stays open while the keyboard is in it (the filter, or a channel
     // reached with the arrows), not for focus a click left behind.
     const active = document.activeElement;
@@ -696,10 +702,15 @@ export function bindRail() {
 
   let frame = 0;
   addEventListener('scroll', () => {
+    // A jump's scroll keeps the pause going; one that never moved the page
+    // has already timed out, and this scroll is the user's own.
+    if (jumping && performance.now() > followPausedUntil) jumping = false;
+    if (jumping) followPausedUntil = performance.now() + 250;
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => followScroll());
   }, { passive: true });
   addEventListener('scrollend', () => {
+    jumping = false;
     followPausedUntil = 0;
     followScroll();
   });
