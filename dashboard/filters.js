@@ -149,6 +149,9 @@ export const RAIL_MAX_TICKS = 18;
 export const RAIL_FILTER_OVER = 10;
 /** Channels before the list gets letter dividers (in the name orders). */
 export const RAIL_LETTERS_FROM = 100;
+/** How the library is laid out: cards in a grid, or one row per video. */
+export const LAYOUTS = ['grid', 'list'];
+
 /** Channels shown in the compact hover peek before expanding to the full list. */
 export const RAIL_PEEK_SIZE = 5;
 /** Channels before hover starts in the compact peek instead of the full list. */
