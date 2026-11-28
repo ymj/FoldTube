@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FoldTube - YouTube Tab Manager",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Fold all your YouTube tabs into one tidy list with a click. Group by channel, search and sort, and never lose a video again.",
   "permissions": [
     "storage",
